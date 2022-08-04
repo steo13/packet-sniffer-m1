@@ -2,6 +2,10 @@ mod pkt_parser;
 
 use crate::pkt_parser::{DecodeError, EthernetHeader, EtherType, Ipv4Header, Protocol, TCPHeader, UDPHeader};
 
+pub fn test_function() {
+    println!("Hello, world!");
+}
+
 // Example
 fn decode_packet(packet: Vec<u8>) -> Result<(), DecodeError>{
     let (eth_header_result, eth_payload) = EthernetHeader::decode(packet);
