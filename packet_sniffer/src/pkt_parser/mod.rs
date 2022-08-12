@@ -1,5 +1,5 @@
 use std::fmt;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
 mod utils {
     use std::fmt;
@@ -48,9 +48,16 @@ mod utils {
     }
 }
 
+/// Header Trait define a common interface for all the Header. An Header should provide a way to decode it from raw data.
+pub trait Header: Debug + Clone {
+    fn decode(data: Vec<u8>) -> (Result<Self, DecodeError>, Vec<u8>);
+}
+
+
 #[derive(Debug, Clone)]
 pub struct DecodeError{
-    pub(crate) msg: String}
+    pub(crate) msg: String
+}
 
 impl Display for DecodeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -73,8 +80,8 @@ pub struct EthernetHeader {
     ether_type: EtherType,
 }
 
-impl EthernetHeader {
-    pub fn decode(data: Vec<u8>) -> (Result<Self, DecodeError>, Vec<u8>) {
+impl Header for EthernetHeader {
+    fn decode(data: Vec<u8>) -> (Result<Self, DecodeError>, Vec<u8>) {
         let len = data.len();
         // Extracting data
         let eth_header = &data[0..14];
@@ -83,8 +90,6 @@ impl EthernetHeader {
 
         // println!("Entire header: {:x?} \n Destination MAC address: {:x?} Source MAC address: {:x?} Ether type: {:x?}", eth_header, &eth_header[0..6], &eth_header[6..12], ether_type);
         let ether_payload = &data[14..len];
-
-        // EthernetHeader creation
 
         let real_ether_type = match ether_type {
             0x0800 => EtherType::Ipv4,
@@ -100,10 +105,14 @@ impl EthernetHeader {
             Vec::from(ether_payload)
         )
     }
+}
 
+impl EthernetHeader {
     pub fn get_ether_type(&self) -> EtherType {
         return self.ether_type.clone();
     }
+    pub fn get_src_address(&self) -> String { return self.src.clone(); }
+    pub fn get_dest_address(&self) -> String { return self.dest.clone(); }
 }
 
 #[derive(Debug, Clone)]
@@ -119,8 +128,8 @@ pub struct Ipv4Header {
     protocol: Protocol,
 }
 
-impl Ipv4Header {
-    pub fn decode(data: Vec<u8>) -> (Result<Self, DecodeError>, Vec<u8>) {
+impl Header for Ipv4Header {
+    fn decode(data: Vec<u8>) -> (Result<Self, DecodeError>, Vec<u8>) {
         let len = data.len();
         let header_len = (data[0] & 0x0f ) as usize;
         // println!("IPV4 header has len {} byte", header_len * 4);
@@ -140,20 +149,23 @@ impl Ipv4Header {
             Vec::from(&data[header_len..len])
         )
     }
+}
 
+impl Ipv4Header {
     pub fn get_protocol(&self) -> Protocol {
         self.protocol.clone()
     }
+    pub fn get_src_address(&self) -> String { return self.src.clone(); }
+    pub fn get_dest_address(&self) -> String { return self.dest.clone(); }
 }
-
 #[derive(Debug, Clone)]
 pub struct UDPHeader {
     dest: u16,
     src: u16,
 }
 
-impl UDPHeader {
-    pub fn decode(data: Vec<u8>) -> (Result<Self, DecodeError>, Vec<u8>) {
+impl Header for UDPHeader {
+    fn decode(data: Vec<u8>) -> (Result<Self, DecodeError>, Vec<u8>) {
         let dest = ((data[0] as u16) << 8) | data[1] as u16;
         let src = ((data[2] as u16) << 8) | data[3] as u16;
         (
@@ -169,8 +181,8 @@ pub struct TCPHeader {
     src: u16,
 }
 
-impl TCPHeader {
-    pub fn decode(data: Vec<u8>) -> (Result<Self, DecodeError>, Vec<u8>) {
+impl Header for TCPHeader {
+    fn decode(data: Vec<u8>) -> (Result<Self, DecodeError>, Vec<u8>) {
         let dest = ((data[0] as u16) << 8) | data[1] as u16;
         let src = ((data[2] as u16) << 8) | data[3] as u16;
         (

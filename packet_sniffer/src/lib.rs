@@ -1,12 +1,12 @@
 mod pkt_parser;
 
-use crate::pkt_parser::{DecodeError, EthernetHeader, EtherType, Ipv4Header, Protocol, TCPHeader, UDPHeader};
+use crate::pkt_parser::{DecodeError, EthernetHeader, EtherType, Header, Ipv4Header, Protocol, TCPHeader, UDPHeader};
 
 pub fn test_function() {
     println!("Hello, world!");
 }
 
-// Example
+/// the function decode_packet use pkt_parser to parse a packet from layer 2 to 4.
 fn decode_packet(packet: Vec<u8>) -> Result<(), DecodeError>{
     let (eth_header_result, eth_payload) = EthernetHeader::decode(packet);
     let eth_header = eth_header_result?;
