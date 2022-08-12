@@ -1,4 +1,4 @@
-use hashmap_lock::hashmap_utils::HashmapLock;
+use hashmap_lock::hashmap_lock::HashmapLock;
 use std::thread;
 
 #[test]

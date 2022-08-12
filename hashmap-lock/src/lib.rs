@@ -1,4 +1,4 @@
-pub mod hashmap_utils {
+pub mod hashmap_lock {
 use std::sync::{Arc, Condvar, Mutex};
     use std::collections::HashMap;
     use std::collections::hash_map::Entry;
