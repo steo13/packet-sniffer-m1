@@ -1,5 +1,5 @@
 [package]
-name = "collect_signal"
+name = "collect_signals"
 version = "0.1.0"
 edition = "2021"
 
