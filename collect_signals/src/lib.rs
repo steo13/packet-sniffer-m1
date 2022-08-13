@@ -1,6 +1,5 @@
 pub mod collect_signals {
     use std::collections::{HashMap, VecDeque};
-    use std::env::Args;
     use std::hash::Hash;
     use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -34,7 +33,7 @@ pub mod collect_signals {
         }
 
         pub fn search_entry(&mut self, key: K) -> Option<V> {
-            let mut l = self.collection.lock().unwrap();
+            let l = self.collection.lock().unwrap();
             return match l.get(&key) {
                 None => None,
                 value => Some(value.unwrap().clone())

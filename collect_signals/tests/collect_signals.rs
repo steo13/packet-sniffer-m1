@@ -115,14 +115,14 @@ fn threads_complete(){
     for e in hm.iter() {
         let k = *e.0;
         match k.0 {
-            0 => {assert!(*e.1==96);},
-            1 => {assert!(*e.1==97);},
-            2 => {assert!(*e.1==98);},
-            3 => {assert!(*e.1==99);},
-            4 => {assert!(*e.1==92);},
-            5 => {assert!(*e.1==93);},
-            6 => {assert!(*e.1==94);},
-            7 => {assert!(*e.1==95);},
+            0 => { assert_eq!(*e.1, 96);},
+            1 => { assert_eq!(*e.1, 97);},
+            2 => { assert_eq!(*e.1, 98);},
+            3 => { assert_eq!(*e.1, 99);},
+            4 => { assert_eq!(*e.1, 92);},
+            5 => { assert_eq!(*e.1, 93);},
+            6 => { assert_eq!(*e.1, 94);},
+            7 => { assert_eq!(*e.1, 95);},
             _ => {}
         }
     }
