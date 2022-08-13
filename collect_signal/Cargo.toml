@@ -1,5 +1,5 @@
 [package]
-name = "hashmap-lock"
+name = "collect_signal"
 version = "0.1.0"
 edition = "2021"
 
