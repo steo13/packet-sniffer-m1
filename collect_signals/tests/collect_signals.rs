@@ -1,8 +1,5 @@
-use std::collections::HashMap;
 use collect_signals::collect_signals::CollectSignals;
 use std::thread;
-use std::time::Duration;
-use std::borrow::Borrow;
 
 #[test]
 fn push_signal() {
