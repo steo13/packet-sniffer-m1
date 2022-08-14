@@ -53,10 +53,10 @@ pub trait Header: Debug + Clone {
     fn decode(data: Vec<u8>) -> (Result<Self, DecodeError>, Vec<u8>);
 }
 
-
+/// A custom error to be returned if something goes wrong during the decoding of the packet.
 #[derive(Debug, Clone)]
 pub struct DecodeError{
-    pub(crate) msg: String
+    pub msg: String
 }
 
 impl Display for DecodeError {
@@ -65,10 +65,12 @@ impl Display for DecodeError {
     }
 }
 
+/// Ether type
 #[derive(Debug, Clone)]
 pub enum EtherType {
     Ipv4,
     Ipv6,
+    /// Arp protocol
     ARP,
 }
 
@@ -86,12 +88,10 @@ impl Header for EthernetHeader {
         // Extracting data
         let eth_header = &data[0..14];
         let ether_type_vec = &eth_header[12..14];
-        let ether_type = ((ether_type_vec[0] as u16) << 8) | ether_type_vec[1] as u16;
-
         // println!("Entire header: {:x?} \n Destination MAC address: {:x?} Source MAC address: {:x?} Ether type: {:x?}", eth_header, &eth_header[0..6], &eth_header[6..12], ether_type);
         let ether_payload = &data[14..len];
 
-        let real_ether_type = match ether_type {
+        let ether_type = match ((ether_type_vec[0] as u16) << 8) | ether_type_vec[1] as u16 {
             0x0800 => EtherType::Ipv4,
             0x0806 => EtherType::ARP,
             0x86DD => EtherType::Ipv6,
@@ -101,7 +101,7 @@ impl Header for EthernetHeader {
             )
         };
         (
-            Ok(EthernetHeader{dest: utils::mac_address_to_string(&eth_header[0..6]), src: utils::mac_address_to_string(&eth_header[6..12]) , ether_type: real_ether_type}),
+            Ok(EthernetHeader{dest: utils::mac_address_to_string(&eth_header[0..6]), src: utils::mac_address_to_string(&eth_header[6..12]) , ether_type }),
             Vec::from(ether_payload)
         )
     }
@@ -158,6 +158,7 @@ impl Ipv4Header {
     pub fn get_src_address(&self) -> String { return self.src.clone(); }
     pub fn get_dest_address(&self) -> String { return self.dest.clone(); }
 }
+
 #[derive(Debug, Clone)]
 pub struct UDPHeader {
     dest: u16,
