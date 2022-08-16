@@ -46,6 +46,10 @@ mod utils {
     pub fn ipv4_address_to_string(address: &[u8]) -> String {
         address.iter().map(|b| b.to_string()).collect::<Vec<String>>().join(".")
     }
+
+    pub fn ipv6_address_to_string(address: &[u8]) -> String {
+        address.iter().hex_display().to_string().replace(" ", "")
+    }
 }
 
 /// Header Trait define a common interface for all the Header. An Header should provide a way to decode it from raw data.
@@ -118,7 +122,8 @@ impl EthernetHeader {
 #[derive(Debug, Clone)]
 pub enum Protocol {
     TCP,
-    UDP
+    UDP,
+    Unknown
 }
 
 #[derive(Debug, Clone)]
@@ -158,6 +163,44 @@ impl Ipv4Header {
     pub fn get_src_address(&self) -> String { return self.src.clone(); }
     pub fn get_dest_address(&self) -> String { return self.dest.clone(); }
 }
+
+#[derive(Debug, Clone)]
+pub struct Ipv6Header {
+    dest: String,
+    src: String,
+    protocol: Protocol,
+}
+
+impl Header for Ipv6Header {
+    fn decode(data: Vec<u8>) -> (Result<Self, DecodeError>, Vec<u8>) {
+        let len = data.len();
+        let protocol = match &data[9] {
+            0x06 => Protocol::TCP,
+            0x11 => Protocol::UDP,
+            _ => Protocol::Unknown
+            /*return (
+                Err(DecodeError{ msg: format!("Unable to identify level 4 protocol. Received 0x{:x}", value) }),
+                data
+            )*/
+        };
+
+        let src_address = utils::ipv6_address_to_string(&data[8..20]);
+        let dest_address = utils::ipv6_address_to_string(&data[20..36]);
+        (
+            Ok(Ipv6Header{src: src_address, dest: dest_address, protocol}),
+            Vec::from(&data[40..len])
+        )
+    }
+}
+
+impl Ipv6Header {
+    pub fn get_protocol(&self) -> Protocol {
+        self.protocol.clone()
+    }
+    pub fn get_src_address(&self) -> String { return self.src.clone(); }
+    pub fn get_dest_address(&self) -> String { return self.dest.clone(); }
+}
+
 
 #[derive(Debug, Clone)]
 pub struct UDPHeader {

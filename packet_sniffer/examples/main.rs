@@ -9,7 +9,7 @@ fn main() {
     let (tx, rx) = channel();
     let t1 = thread::spawn(move || {
         let tx = tx.clone();
-        let mut cap = Capture::from_file("sample_capture.pcap").unwrap();
+        let mut cap = Capture::from_file("ipv6_capture.pcap").unwrap();
         while let Ok(packet) = cap.next() {
             tx.send(Vec::from(packet.data)).unwrap();
             //println!("{:?}", Vec::from(packet.data));

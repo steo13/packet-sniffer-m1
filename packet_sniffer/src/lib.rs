@@ -1,6 +1,6 @@
 mod pkt_parser;
 
-use crate::pkt_parser::{DecodeError, EthernetHeader, EtherType, Header, Ipv4Header, Protocol, TCPHeader, UDPHeader};
+use crate::pkt_parser::{DecodeError, EthernetHeader, EtherType, Header, Ipv4Header, Ipv6Header, Protocol, TCPHeader, UDPHeader};
 
 pub fn test_function() {
     println!("Hello, world!");
@@ -29,8 +29,32 @@ pub fn decode_packet(packet: Vec<u8>) -> Result<(), DecodeError>{
                     let tcp_header = tcp_header_result?;
                     println!("{:?}", tcp_header);
                 }
+                Protocol::Unknown => {
+                    println!("Unknown 4");
+                }
             }
         },
+        EtherType::Ipv6 => {
+            let (ipv6_header_result, ipv6_payload) = Ipv6Header::decode(eth_payload);
+            let ipv6_header = ipv6_header_result?;
+
+            println!("{:?}", ipv6_header);
+            match ipv6_header.get_protocol() {
+                Protocol::UDP => {
+                    let (udp_header_result, udp_payload) = UDPHeader::decode(ipv6_payload);
+                    let udp_header = udp_header_result?;
+                    println!("{:?}", udp_header);
+                },
+                Protocol::TCP => {
+                    let (tcp_header_result, tcp_payload) = TCPHeader::decode(ipv6_payload);
+                    let tcp_header = tcp_header_result?;
+                    println!("{:?}", tcp_header);
+                },
+                Protocol::Unknown => {
+                    println!("Unknown 4");
+                }
+            }
+        }
         _ => return Err(DecodeError{msg: "Cannot decode other level 3 header".parse().unwrap() }),
     };
     Ok(())
