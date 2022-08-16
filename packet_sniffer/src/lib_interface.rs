@@ -1,3 +1,4 @@
+/*
 use std::fmt::Error;
 use std::fs::File;
 use std::io::Write;
@@ -6,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use crate::collect_signals::collect_signals;
 use crate::pkt_parser::{DecodeError, EthernetHeader, EtherType, Header, Ipv4Header, Protocol, TCPHeader, UDPHeader};
 
-struct Sniffer {
+pub struct Sniffer {
     device: Option<pcap::Device>,
     status: Arc<Mutex<RunStatus>>,
     file: Option<File>,
@@ -118,3 +119,4 @@ impl Sniffer {
         }
     }
 }
+*/
