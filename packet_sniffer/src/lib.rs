@@ -1,6 +1,6 @@
 mod pkt_parser;
 mod collect_signals;
-mod lib_interface;
+mod sniffer_example;
 
 use crate::pkt_parser::{DecodeError, EthernetHeader, EtherType, Header, Ipv4Header, Protocol, TCPHeader, UDPHeader};
 
