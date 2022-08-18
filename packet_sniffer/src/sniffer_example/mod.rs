@@ -3,21 +3,34 @@ pub mod sniffer {
     use std::io::Write;
     use std::path::Path;
     use std::sync::{Arc, Mutex};
+    use std::fmt::{Display, Formatter};
 
     pub struct Sniffer {
         device: Option<pcap::Device>,
-        status: Arc<Mutex<RunStatus>>,
+        pub status: Arc<Mutex<RunStatus>>,
         file: Option<File>,
         time_interval: u64
     }
 
-    #[derive(PartialEq)]
+    #[derive(PartialEq, Debug, Clone)]
     pub enum RunStatus {
         Stop, Wait, Running, Error(String)
     }
 
+    #[derive(Debug)]
     pub enum SnifferError {
-        PcapError(pcap::Error), DecodeError(String), UserError(String)
+        PcapError(pcap::Error), DecodeError(String), UserError(String), UserWarning(String)
+    }
+
+    impl Display for SnifferError {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            match self {
+                SnifferError::DecodeError(e) => write!(f, "{}", e),
+                SnifferError::UserError(e) => write!(f, "{}", e),
+                SnifferError::PcapError(e) => write!(f, "{}", e.to_string()),
+                SnifferError::UserWarning(e) => write!(f, "{}", e)
+            }
+        }
     }
 
     impl Sniffer {
@@ -71,7 +84,7 @@ pub mod sniffer {
                     self.time_interval = time_interval;
                     Ok(())
                 },
-                Err(e) => Err(SnifferError::UserError("The file doesn't exist".to_string()))
+                Err(_) => Err(SnifferError::UserError("The file doesn't exist".to_string()))
             }
         }
 
