@@ -20,7 +20,7 @@ mod utils {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             for byte in self.0 {
                 // Decide if you want to pad the value or have spaces inbetween, etc.
-                write!(f, "{:02x} ", byte)?;
+                write!(f, "{:02x}", byte)?;
             }
             Ok(())
         }
@@ -89,6 +89,7 @@ pub struct EthernetHeader {
 impl Header for EthernetHeader {
     fn decode(data: Vec<u8>) -> (Result<Self, DecodeError>, Vec<u8>) {
         let len = data.len();
+        if len < 14 { return (Err(DecodeError{msg: "Cannot decode an ethernet packet because is not long enough.".to_string()}), data) }
         // Extracting data
         let eth_header = &data[0..14];
         let ether_type_vec = &eth_header[12..14];
@@ -136,7 +137,11 @@ pub struct Ipv4Header {
 impl Header for Ipv4Header {
     fn decode(data: Vec<u8>) -> (Result<Self, DecodeError>, Vec<u8>) {
         let len = data.len();
+        if len < 20 {
+            return (Err(DecodeError{msg: "Cannot decode ipv4 packet because is not long enough.".to_string()}), data)
+        }
         let header_len = (data[0] & 0x0f ) as usize * 4;
+
         let protocol = match &data[9] {
             0x06 => Protocol::TCP,
             0x11 => Protocol::UDP,
@@ -254,9 +259,17 @@ mod tests {
         let data = vec![51, 51, 0, 1, 0, 2, 80, 235, 113, 35, 142, 103, 134, 221, 96, 9, 31, 94, 0, 103, 17, 1, 254, 128, 0, 0, 0, 0, 0, 0, 5, 194, 180, 157, 9, 91, 63, 25, 255, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 2, 34, 2, 35, 0, 103, 0, 211, 1, 228, 89, 38, 0, 8, 0, 2, 12, 31, 0, 1, 0, 14, 0, 1, 0, 1, 42, 94, 58, 157, 80, 235, 113, 35, 142, 103, 0, 3, 0, 12, 10, 80, 235, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 39, 0, 17, 0, 15, 68, 69, 83, 75, 84, 79, 80, 45, 83, 86, 65, 65, 84, 84, 52, 0, 16, 0, 14, 0, 0, 1, 55, 0, 8, 77, 83, 70, 84, 32, 53, 46, 48, 0, 6, 0, 8, 0, 17, 0, 23, 0, 24, 0, 39];
         let (ethernet_header_res, payload) = EthernetHeader::decode(data);
         let ethernet_header = ethernet_header_res.unwrap();
-        assert_eq!(ethernet_header.get_dest_address(), "33330102".to_string());
+        assert_eq!(ethernet_header.get_dest_address(), "333300010002".to_string());
         assert_eq!(ethernet_header.get_src_address(), "50eb71238e67".to_string());
         assert_eq!(ethernet_header.get_ether_type(), EtherType::Ipv6);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_empty_packet() {
+        let data = vec![];
+        let (ethernet_header_res, payload) = EthernetHeader::decode(data);
+        ethernet_header_res.unwrap();
     }
 
     #[test]
