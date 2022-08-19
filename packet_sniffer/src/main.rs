@@ -1,3 +1,5 @@
+use std::arch::aarch64::vreinterpret_u8_f32;
+use std::env::args;
 use std::io::{stdin, stdout, Write};
 use std::ops::Deref;
 use pcap::Device;
@@ -7,6 +9,7 @@ use crate::sniffer_example::sniffer::{RunStatus, Sniffer};
 use clap::Parser;
 use std::fs::File;
 use std::path::Path;
+use std::process::exit;
 
 mod sniffer_example;
 
@@ -22,8 +25,21 @@ struct Args {
 fn main() {
     let mut sniffer = Sniffer::new();
     let mut cmd = String::new();
-    let _ = Args::parse();
-    println!("Welcome to the Packet-Sniffer-M1 interface, write '?' or 'help' to know the list of possible commands");
+    let args = Args::parse();
+
+    if args.file == "None" && args.interval == 0 {
+        println!("Welcome to the Packet-Sniffer-M1 interface, write '{}' or '{}' to know the list of possible commands",
+                 Colour::Red.italic().paint("?"), Colour::Red.italic().paint("help"));
+    } else {
+        if args.interval > 0 && args.file == "None" {
+            print!("{}", Colour::Yellow.italic().paint("If you have run the application with arguments, the --file argument is mandatory"));
+            return;
+        } else {
+            devices();
+            sniffing(args.file, 0, &mut sniffer);
+        }
+    }
+
     loop {
         cmd.clear();
 
@@ -31,14 +47,14 @@ fn main() {
         let s = status.lock().unwrap().clone();
         std::mem::drop(status);
 
+
         let mut stat = "";
         match s {
-            RunStatus::Running => { stat = "Running" },
-            RunStatus::Wait => { stat = "Waiting" },
+            RunStatus::Running => { stat = "Running"; print!("Packet-Sniffer-M1 ({}) >>> ", Colour::Green.italic().paint("Running")); },
+            RunStatus::Wait => { stat = "Waiting"; print!("Packet-Sniffer-M1 ({}) >>> ", Colour::Yellow.italic().paint("Waiting"));},
             RunStatus::Error(e) => { println!("{}", e); return; }
-            _ => { stat = "" }
+            _ => { stat = "No Sniffing"; print!("Packet-Sniffer-M1 ({}) >>> ", Colour::Blue.italic().paint("No Running"));}
         }
-        if stat == "" { print!("Packet-Sniffer-M1 >>> "); } else { print!("Packet-Sniffer-M1 ({}) >>> ", stat) }
 
         stdout().flush().unwrap();
         stdin().read_line(&mut cmd).unwrap();
@@ -132,12 +148,13 @@ fn main() {
                                     println!("Please insert a positive number for the interval (sec)");
                                     continue
                                 } else {
-                                    sniffer.set_time_interval(split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().unwrap());
+                                    //sniffer.set_time_interval(split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().unwrap());
                                 }
                             }
                         }
                     }
-                    sniffer.set_file(Some(File::create(Path::new(*split.get(pos_file.unwrap() +1).unwrap())).unwrap()));
+                    //sniffer.set_file(Some(File::create(Path::new(*split.get(pos_file.unwrap() +1).unwrap())).unwrap()));
+                    devices();
                     //TODO: use run method
                 }
                 else{
@@ -151,12 +168,8 @@ fn main() {
 fn help() {
     println!("The commands available are:");
     println!("-> {} {} {} {} {}", Colour::Red.paint("sniffing"),
-             Colour::Blue.paint("-device"), Colour::Blue.italic().paint("device_name"),
-             Colour::Yellow.paint("-file"), Colour::Yellow.italic().paint("file_name"));
-    println!("-> {} {} {} {} {} {} {}", Colour::Red.paint("sniffing"),
-             Colour::Blue.paint("-device"), Colour::Blue.italic().paint("device_name"),
-             Colour::Green.paint("-interval"), Colour::Green.italic().paint("time_interval (sec)"),
-             Colour::Yellow.paint("-file"), Colour::Yellow.italic().paint("file_name"));
+             Colour::Yellow.paint("-file"), Colour::Yellow.italic().paint("file_name"),
+             Colour::Green.paint("[-interval"), Colour::Green.paint("time_interval (sec)]"));
     println!("-> {} (List of all the devices available)", Colour::Red.paint("devices"));
     println!("-> {} (Pause the sniffing if it is running)", Colour::Red.paint("pause"));
     println!("-> {} (Resume the sniffing)", Colour::Red.paint("resume"));
@@ -169,4 +182,39 @@ fn devices() {
     println!("All the devices which could be sniffed are:");
     for device in devices { print!("{} ", Colour::Blue.paint(device.name)); }
     print!("\n");
+}
+
+fn sniffing(filename: String, timestamp: u64, sniffer: &mut Sniffer) {
+    let mut cmd = String::new();
+    print!("Which device would you sniff? ");
+
+    loop {
+        cmd.clear();
+        stdout().flush().unwrap();
+        stdin().read_line(&mut cmd).unwrap();
+
+        match cmd.trim().to_ascii_lowercase().as_str() {
+            "exit" => exit(0),
+            _ => {
+                for device in Device::list().unwrap() {
+                    if device.name == cmd.trim().to_ascii_lowercase().as_str() {
+                        if timestamp == 0 {
+                            match sniffer.run(filename) {
+                                Err(e) => { println!("{}", e); exit(1); }
+                                _ => {}
+                            }
+                        } else {
+                            match sniffer.run_with_interval(timestamp, filename) {
+                                Err(e) => { println!("{}", e); exit(1); }
+                                _ => {}
+                            }
+                        }
+                        println!("The scanning is running ...");
+                        return;
+                    }
+                }
+                print!("Insert a valid device name, which device would you sniff? ");
+            }
+        }
+    }
 }
