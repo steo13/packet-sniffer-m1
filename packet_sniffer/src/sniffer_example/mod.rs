@@ -128,5 +128,21 @@ pub mod sniffer {
                 },
             }
         }
+
+        pub fn time_interval(&self) -> u64 {
+            self.time_interval
+        }
+
+        pub fn set_time_interval(&mut self, time_interval: u64) {
+            self.time_interval = time_interval;
+        }
+
+        pub fn file(&self) -> &Option<File> {
+            &self.file
+        }
+
+        pub fn set_file(&mut self, file: Option<File>) {
+            self.file = file;
+        }
     }
 }

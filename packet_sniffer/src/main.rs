@@ -5,6 +5,9 @@ use ansi_term::Colour;
 use ansi_term::Style;
 use crate::sniffer_example::sniffer::{RunStatus, Sniffer};
 use clap::Parser;
+use std::fs::File;
+use std::path::Path;
+
 mod sniffer_example;
 
 #[derive(Parser, Debug)]
@@ -109,10 +112,38 @@ fn main() {
                     }
                 }
             },
-            "sniffing" => {
+            x => {
+                if x.starts_with("sniffing") {
+                    //TODO: check if another sniffing is already running
+                    let split: Vec<&str> = x.split(" ").filter(|x| *x != "").collect();
 
+                    let pos_file = split.iter().position(|x| *x == "-file");
+                    if pos_file.is_none() {
+                        println!("The file argument is mandatory, please insert something");
+                        continue
+                    } else {
+                        if pos_file.unwrap() == split.len() - 1 || split.get(pos_file.unwrap() + 1).unwrap().starts_with("-") {
+                            println!("Please insert a filename (not an argument, just a name)");
+                            continue
+                        } else {
+                            let pos_interval = split.iter().position(|x| *x == "-interval");
+                            if pos_interval.is_some() {
+                                if pos_interval.unwrap() == split.len() - 1 || split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().is_err() {
+                                    println!("Please insert a positive number for the interval (sec)");
+                                    continue
+                                } else {
+                                    sniffer.set_time_interval(split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().unwrap());
+                                }
+                            }
+                        }
+                    }
+                    sniffer.set_file(Some(File::create(Path::new(*split.get(pos_file.unwrap() +1).unwrap())).unwrap()));
+                    //TODO: use run method
+                }
+                else{
+                    println!("Unknown command!")
+                }
             }
-            _ => println!("Unknown command!")
         }
     };
 }
