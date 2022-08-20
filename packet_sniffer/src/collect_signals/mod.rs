@@ -1,29 +1,31 @@
 pub mod collect_signals {
     use std::collections::{HashMap, VecDeque};
     use std::hash::Hash;
-    use std::sync::{Arc, Mutex, MutexGuard};
+    use std::sync::{Arc, Mutex, MutexGuard, Condvar};
 
     #[derive(Clone)]
     pub struct CollectSignals<S, K, V> {
-        command_queue: Arc<Mutex<VecDeque<S>>>,
+        command_queue: Arc<(Mutex<VecDeque<S>>,Condvar)>,
         collection: Arc<Mutex<HashMap<K, V>>>,
     }
 
     impl<S, K: Clone + Eq + Hash, V:  Clone + Eq + Hash> CollectSignals<S, K, V> {
         pub fn new() -> Self {
             return CollectSignals {
-                command_queue: Arc::new(Mutex::new(VecDeque::<S>::new())),
+                command_queue: Arc::new((Mutex::new(VecDeque::<S>::new()),Condvar::new())),
                 collection: Arc::new(Mutex::new(HashMap::<K, V>::new()))
             }
         }
 
         pub fn insert_signal(&mut self, signal: S) {
-            let mut l = self.command_queue.lock().unwrap();
+            let mut l = self.command_queue.0.lock().unwrap();
             l.push_back(signal);
+            self.command_queue.1.notify_one();
         }
 
-        pub fn extract_signal(&mut self) -> Option<S> {
-            let mut l = self.command_queue.lock().unwrap();
+        pub fn extract_signal(&mut self) -> S {
+            let mut l = self.command_queue.0.lock().unwrap();
+            self.command_queue.1.wait_while(l,l.is_empty());
             return l.pop_front();
         }
 
