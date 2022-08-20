@@ -1,9 +1,9 @@
 use std::sync::mpsc::channel;
 use std::thread;
-use pcap::Capture;
+use pcap::{Capture, Device};
 
 fn main() {
-    println!("Ex - 02 reading from a pcap file");
+    /*println!("Ex - 02 reading from a pcap file");
     println!("Multithread example");
 
     let (tx, rx) = channel();
@@ -23,5 +23,10 @@ fn main() {
             Ok(()) => (),
             Err(e) => println!("{:?}", e)
         }
-    }
+    }*/
+    let devices = Device::list().unwrap();
+    println!("The devices that could be monitored are:");
+    for device in devices { print!("{} ", device.name) }
+    println!("\nChoose one of them >>> ");
+
 }
