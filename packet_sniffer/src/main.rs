@@ -36,7 +36,7 @@ fn main() {
             return;
         } else {
             devices();
-            sniffing(args.file, 0, &mut sniffer);
+            sniffing(args.file, args.interval, &mut sniffer);
         }
     }
 
@@ -46,7 +46,6 @@ fn main() {
         let mut status = sniffer.status.clone();
         let s = status.lock().unwrap().clone();
         std::mem::drop(status);
-
 
         let mut stat = "";
         match s {
@@ -132,8 +131,9 @@ fn main() {
                 if x.starts_with("sniffing") {
                     //TODO: check if another sniffing is already running
                     let split: Vec<&str> = x.split(" ").filter(|x| *x != "").collect();
+                    let mut timestamp = 0;
 
-                    let pos_file = split.iter().position(|x| *x == "-file");
+                    let pos_file = split.iter().position(|x| *x == "--file");
                     if pos_file.is_none() {
                         println!("The file argument is mandatory, please insert something");
                         continue
@@ -142,19 +142,22 @@ fn main() {
                             println!("Please insert a filename (not an argument, just a name)");
                             continue
                         } else {
-                            let pos_interval = split.iter().position(|x| *x == "-interval");
+                            let pos_interval = split.iter().position(|x| *x == "--interval");
                             if pos_interval.is_some() {
                                 if pos_interval.unwrap() == split.len() - 1 || split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().is_err() {
                                     println!("Please insert a positive number for the interval (sec)");
                                     continue
                                 } else {
                                     //sniffer.set_time_interval(split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().unwrap());
+                                    timestamp = split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().unwrap();
                                 }
                             }
                         }
                     }
                     //sniffer.set_file(Some(File::create(Path::new(*split.get(pos_file.unwrap() +1).unwrap())).unwrap()));
+                    let filename = (*split.get(pos_file.unwrap() + 1).unwrap().to_string()).to_string();
                     devices();
+                    sniffing(filename, timestamp, &mut sniffer);
                     //TODO: use run method
                 }
                 else{
@@ -168,8 +171,8 @@ fn main() {
 fn help() {
     println!("The commands available are:");
     println!("-> {} {} {} {} {}", Colour::Red.paint("sniffing"),
-             Colour::Yellow.paint("-file"), Colour::Yellow.italic().paint("file_name"),
-             Colour::Green.paint("[-interval"), Colour::Green.paint("time_interval (sec)]"));
+             Colour::Yellow.paint("--file"), Colour::Yellow.italic().paint("file_name"),
+             Colour::Green.paint("[--interval"), Colour::Green.paint("time_interval (sec)]"));
     println!("-> {} (List of all the devices available)", Colour::Red.paint("devices"));
     println!("-> {} (Pause the sniffing if it is running)", Colour::Red.paint("pause"));
     println!("-> {} (Resume the sniffing)", Colour::Red.paint("resume"));
@@ -203,13 +206,15 @@ fn sniffing(filename: String, timestamp: u64, sniffer: &mut Sniffer) {
                                 Err(e) => { println!("{}", e); exit(1); }
                                 _ => {}
                             }
+                            println!("The scanning is running ...")
                         } else {
                             match sniffer.run_with_interval(timestamp, filename) {
                                 Err(e) => { println!("{}", e); exit(1); }
                                 _ => {}
                             }
+                            println!("The scanning is running (saving after {} {}) ...",
+                                     Colour::Red.paint(timestamp.to_string().as_str()), Colour::Red.paint("sec"));
                         }
-                        println!("The scanning is running ...");
                         return;
                     }
                 }

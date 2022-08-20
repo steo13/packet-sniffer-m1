@@ -22,12 +22,12 @@ pub fn decode_packet(packet: Vec<u8>) -> Result<(), DecodeError>{
             println!("{:?}", ipv4_header);
             match ipv4_header.get_protocol() {
                 Protocol::UDP => {
-                    let (udp_header_result, udp_payload) = UDPHeader::decode(ipv4_payload);
+                    let (udp_header_result, _udp_payload) = UDPHeader::decode(ipv4_payload);
                     let udp_header = udp_header_result?;
                     println!("{:?}", udp_header);
                 }
                 Protocol::TCP => {
-                    let (tcp_header_result, tcp_payload) = TCPHeader::decode(ipv4_payload);
+                    let (tcp_header_result, _tcp_payload) = TCPHeader::decode(ipv4_payload);
                     let tcp_header = tcp_header_result?;
                     println!("{:?}", tcp_header);
                 }
