@@ -25,8 +25,8 @@ pub mod collect_signals {
 
         pub fn extract_signal(&mut self) -> S {
             let mut l = self.command_queue.0.lock().unwrap();
-            self.command_queue.1.wait_while(l,l.is_empty());
-            return l.pop_front();
+            let mut res = self.command_queue.1.wait_while(l, |x| x.is_empty()).unwrap();
+            return res.pop_front().unwrap();
         }
 
         pub fn insert_entry(&mut self, key: K, value: V) {
@@ -68,7 +68,7 @@ mod tests {
     fn pop_signal() {
         let mut cs = CollectSignals::<u8, String, String>::new();
         cs.insert_signal(10);
-        assert_eq!(10, cs.extract_signal().unwrap())
+        assert_eq!(10, cs.extract_signal())
     }
 
     #[test]
@@ -80,7 +80,7 @@ mod tests {
 
     #[test]
     fn threads_signals(){
-        let mut cs = CollectSignals::<((u32, u32), String), (u32, u32), String>::new();
+        let mut cs = CollectSignals::<((i32, i32), String), (i32, i32), String>::new();
         let mut threads = vec![];
         for i in 0..100 {
             cs.insert_signal(((i,i),"prova".to_string()));
@@ -91,12 +91,15 @@ mod tests {
                 println!("thread: {}",t);
                 loop {
                     let command = c.extract_signal();
-                    if command.is_none(){
+                    if command.0.0 == -1 {
                         return;
                     }
-                    println!("{:?}, thread: {}",command.unwrap(),t);
+                    println!("{:?}, thread: {}",command,t);
                 }
             }));
+        }
+        for _ in 0..5 {
+            cs.insert_signal(((-1,1),"".to_string()));
         }
         for t in threads {
             t.join().unwrap();
@@ -105,7 +108,7 @@ mod tests {
 
     #[test]
     fn threads_operate(){
-        let mut cs = CollectSignals::<((u32, u32), String), (u32, u32), String>::new();
+        let mut cs = CollectSignals::<((i32, i32), String), (u32, u32), String>::new();
         let mut threads = vec![];
         for i in 0..100 {
             cs.insert_entry((i,i),"prova".to_string());
@@ -122,6 +125,9 @@ mod tests {
                 }
             }));
         }
+        for _ in 0..5 {
+            cs.insert_signal(((-1,1),"".to_string()));
+        }
         for t in threads {
             t.join().unwrap();
         }
@@ -137,14 +143,10 @@ mod tests {
         for t in 0..5 {
             let mut c = cs.clone();
             threads.push(thread::spawn(move||{
-                println!("thread: {}",t);
                 loop {
+                    println!("not locked");
                     let command = c.extract_signal();
-                    if command.is_none(){
-                        //return;
-                        continue;
-                    }
-                    if command.unwrap().0.0 == -1 {
+                    if command.0.0 == -1 {
                         return;
                     }
                     let mut hashmap = c.lock_hashmap();
@@ -152,9 +154,9 @@ mod tests {
                     if e.is_some() && e.unwrap()<command.unwrap().1 || e.is_none(){
                         c.insert_collection((command.unwrap().0.0, command.unwrap().0.1), command.unwrap().1);
                     }*/
-                    let e = hashmap.get(&(command.unwrap().0.0,command.unwrap().0.1));
-                    if e.is_some() && *e.unwrap()<command.unwrap().1 || e.is_none(){
-                        hashmap.insert((command.unwrap().0.0, command.unwrap().0.1),command.unwrap().1);
+                    let e = hashmap.get(&(command.0.0,command.0.1));
+                    if e.is_some() && *e.unwrap()<command.1 || e.is_none(){
+                        hashmap.insert((command.0.0, command.0.1),command.1);
                     }
                 }
             }));
