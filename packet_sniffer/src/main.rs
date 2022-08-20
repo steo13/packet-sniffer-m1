@@ -1,17 +1,15 @@
-use std::arch::arch64::vreinterpret_u8_f32;
 use std::env::args;
 use std::io::{stdin, stdout, Write};
 use std::ops::Deref;
 use pcap::Device;
 use ansi_term::Colour;
 use ansi_term::Style;
-use crate::sniffer_example::sniffer::{RunStatus, Sniffer};
 use clap::Parser;
 use std::fs::File;
 use std::path::Path;
 use std::process::exit;
+use packet_sniffer::sniffer::{RunStatus, Sniffer};
 
-mod sniffer_example;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -206,7 +204,11 @@ fn sniffing(filename: String, timestamp: u64, sniffer: &mut Sniffer) {
             "exit" => exit(0),
             _ => {
                 for device in Device::list().unwrap() {
-                    if device.name == cmd.trim().to_ascii_lowercase().as_str() {
+                    if device.name == cmd.trim().to_string().as_str() {
+                        match sniffer.attach(device) {
+                            Ok(()) => (),
+                            Err(e) => {println!("{}", e); exit(1)},
+                        };
                         if timestamp == 0 {
                             match sniffer.run(filename) {
                                 Err(e) => { println!("{}", e); exit(1); }
