@@ -1,4 +1,4 @@
-use std::arch::aarch64::vreinterpret_u8_f32;
+use std::arch::arch64::vreinterpret_u8_f32;
 use std::env::args;
 use std::io::{stdin, stdout, Write};
 use std::ops::Deref;
@@ -128,37 +128,44 @@ fn main() {
                 }
             },
             x => {
-                if x.starts_with("sniffing") {
-                    //TODO: check if another sniffing is already running
-                    let split: Vec<&str> = x.split(" ").filter(|x| *x != "").collect();
-                    let mut timestamp = 0;
+                if x.starts_with("sniff") {
+                    match s {
+                        RunStatus::Running | RunStatus::Wait => {
+                            println!("Another sniffing is already running");
+                        },
+                        _ => {
+                            //TODO: check if another sniffing is already running
+                            let split: Vec<&str> = x.split(" ").filter(|x| *x != "").collect();
+                            let mut timestamp = 0;
 
-                    let pos_file = split.iter().position(|x| *x == "--file");
-                    if pos_file.is_none() {
-                        println!("The file argument is mandatory, please insert something");
-                        continue
-                    } else {
-                        if pos_file.unwrap() == split.len() - 1 || split.get(pos_file.unwrap() + 1).unwrap().starts_with("-") {
-                            println!("Please insert a filename (not an argument, just a name)");
-                            continue
-                        } else {
-                            let pos_interval = split.iter().position(|x| *x == "--interval");
-                            if pos_interval.is_some() {
-                                if pos_interval.unwrap() == split.len() - 1 || split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().is_err() {
-                                    println!("Please insert a positive number for the interval (sec)");
+                            let pos_file = split.iter().position(|x| *x == "--file");
+                            if pos_file.is_none() {
+                                println!("The file argument is mandatory, please insert something");
+                                continue
+                            } else {
+                                if pos_file.unwrap() == split.len() - 1 || split.get(pos_file.unwrap() + 1).unwrap().starts_with("-") {
+                                    println!("Please insert a filename (not an argument, just a name)");
                                     continue
                                 } else {
-                                    //sniffer.set_time_interval(split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().unwrap());
-                                    timestamp = split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().unwrap();
+                                    let pos_interval = split.iter().position(|x| *x == "--interval");
+                                    if pos_interval.is_some() {
+                                        if pos_interval.unwrap() == split.len() - 1 || split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().is_err() {
+                                            println!("Please insert a positive number for the interval (sec)");
+                                            continue
+                                        } else {
+                                            //sniffer.set_time_interval(split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().unwrap());
+                                            timestamp = split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().unwrap();
+                                        }
+                                    }
                                 }
                             }
+                            //sniffer.set_file(Some(File::create(Path::new(*split.get(pos_file.unwrap() +1).unwrap())).unwrap()));
+                            let filename = (*split.get(pos_file.unwrap() + 1).unwrap().to_string()).to_string();
+                            devices();
+                            sniffing(filename, timestamp, &mut sniffer);
+                            //TODO: use run method
                         }
                     }
-                    //sniffer.set_file(Some(File::create(Path::new(*split.get(pos_file.unwrap() +1).unwrap())).unwrap()));
-                    let filename = (*split.get(pos_file.unwrap() + 1).unwrap().to_string()).to_string();
-                    devices();
-                    sniffing(filename, timestamp, &mut sniffer);
-                    //TODO: use run method
                 }
                 else{
                     println!("Unknown command!")
@@ -170,7 +177,7 @@ fn main() {
 
 fn help() {
     println!("The commands available are:");
-    println!("-> {} {} {} {} {}", Colour::Red.paint("sniffing"),
+    println!("-> {} {} {} {} {}", Colour::Red.paint("sniff"),
              Colour::Yellow.paint("--file"), Colour::Yellow.italic().paint("file_name"),
              Colour::Green.paint("[--interval"), Colour::Green.paint("time_interval (sec)]"));
     println!("-> {} (List of all the devices available)", Colour::Red.paint("devices"));
