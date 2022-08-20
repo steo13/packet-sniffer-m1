@@ -62,29 +62,29 @@ pub mod sniffer {
         }
 
         pub fn run(&mut self, filename: String) -> Result<(), SnifferError> {
-            let file = File::open(Path::new(&filename));
             let mut s = self.status.lock().unwrap();
-            return match file {
+            let file = File::create(Path::new(&filename));
+            match file {
                 Ok(_) => {
                     *s = RunStatus::Running;
                     self.file = Some(file.unwrap());
                     Ok(())
                 },
-                Err(_) => Err(SnifferError::UserError("The file doesn't exist".to_string()))
+                Err(_) => Err(SnifferError::UserError("The file can't be created".to_string()))
             }
         }
 
         pub fn run_with_interval(&mut self, time_interval: u64, filename: String) -> Result<(), SnifferError> {
-            let file = File::open(Path::new(&filename));
             let mut s = self.status.lock().unwrap();
-            return match file {
+            let file = File::create(Path::new(&filename));
+            match file {
                 Ok(_) => {
                     *s = RunStatus::Running;
                     self.file = Some(file.unwrap());
                     self.time_interval = time_interval;
                     Ok(())
                 },
-                Err(_) => Err(SnifferError::UserError("The file doesn't exist".to_string()))
+                Err(_) => Err(SnifferError::UserError("The file can't be created".to_string()))
             }
         }
 
@@ -111,7 +111,7 @@ pub mod sniffer {
         }
 
         pub fn save_report(&self) -> Result<(), SnifferError> {
-            let mut s = self.status.lock().unwrap();
+            let s = self.status.lock().unwrap();
             return match *s {
                 RunStatus::Stop => Err(SnifferError::UserError("The device is not running".to_string())),
                 _ => {
