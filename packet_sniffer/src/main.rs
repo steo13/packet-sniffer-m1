@@ -134,7 +134,6 @@ fn main() {
                             println!("Another sniffing is already running");
                         },
                         _ => {
-                            //TODO: check if another sniffing is already running
                             let split: Vec<&str> = x.split(" ").filter(|x| *x != "").collect();
                             let mut timestamp = 0;
 
