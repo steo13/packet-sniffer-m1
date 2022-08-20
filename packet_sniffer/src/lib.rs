@@ -9,6 +9,7 @@ pub mod sniffer {
     use std::fmt::{Display, Formatter};
     use std::sync::mpsc::channel;
     use std::thread;
+    use std::time::Duration;
     use pcap::Capture;
     use crate::pkt_parser::{DecodeError, EthernetHeader, EtherType, Header, Ipv4Header, Ipv6Header, Protocol, TCPHeader, UDPHeader};
 
@@ -138,9 +139,10 @@ pub mod sniffer {
                         let tx = tx.clone();
                         let mut cap = Capture::from_device(device).unwrap().promisc(true).open().unwrap();
 
-                        while let Ok(packet) = cap.next() {
+                        while let Ok(packet) = cap.next_packet() {
                             // check if state is running
                             tx.send(Vec::from(packet.data)).unwrap();
+                            thread::sleep(Duration::from_millis(20));
                         }
                         println!("Basta sniff");
 

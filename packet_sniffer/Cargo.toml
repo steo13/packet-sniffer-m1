@@ -7,5 +7,5 @@ edition = "2021"
 
 [dependencies]
 ansi_term = "0.12"
-pcap = "0.9"
+pcap = "0.10.1"
 clap = { version = "3.1.6", features = ["derive"] }
