@@ -123,6 +123,7 @@ pub mod sniffer {
         };
         Ok(())
     }
+
     pub struct Sniffer {
         device: Option<pcap::Device>,
         pub status: Arc<Mutex<RunStatus>>,
@@ -176,6 +177,16 @@ pub mod sniffer {
             }
         }
 
+        pub fn get_status(&self) -> RunStatus {
+            let s = self.status.lock().unwrap();
+            return (*s).clone();
+        }
+
+        pub fn set_status(&self, status: RunStatus) -> () {
+            let mut s = self.status.lock().unwrap();
+            *s = status;
+        }
+
         pub fn attach(&mut self, device: pcap::Device) -> Result<(), SnifferError> {
             return match Sniffer::list_devices() {
                 Ok(devices) => {
@@ -221,7 +232,9 @@ pub mod sniffer {
                                         Err(e) => { println!("{:?}", e); exit(1); }
                                     }
                                 },
-                                _ => { println!("Ue, basta"); continue; }
+                                RunStatus::Wait => { continue; },
+                                RunStatus::Stop => { println!("Ending the thread"); break; }
+                                RunStatus::Error(e) => { println!("{}", e)}
                             }
                             thread::sleep(Duration::from_nanos(100));
                         };
