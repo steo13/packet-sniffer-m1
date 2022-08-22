@@ -14,6 +14,12 @@ pub mod sniffer {
     use pcap::{Capture, Device};
     use crate::pkt_parser::{DecodeError, EthernetHeader, EtherType, Header, Ipv4Header, Ipv6Header, Protocol, TCPHeader, UDPHeader};
 
+    #[derive(Debug, Clone, PartialEq)]
+    enum Direction {
+        Received,
+        Transmitted
+    }
+
     /// the function decode_packet use pkt_parser to parse a packet from layer 2 to 4.
     pub fn decode_packet(packet: Vec<u8>) -> Result<(), DecodeError>{
         let (eth_header_result, eth_payload) = EthernetHeader::decode(packet);
@@ -69,15 +75,27 @@ pub mod sniffer {
         };
         Ok(())
     }
-    pub fn decode_info_from_packet(device: Device, packet: Vec<u8>) -> Result<(), DecodeError> {
+
+    fn get_direction_from_ipv4(header: Ipv4Header, device: Device) -> Direction {
+        Direction::received
+    }
+
+    fn get_direction_from_ipv6(header: Ipv4Header, device: Device) -> Direction {
+        Direction::received
+    }
+
+    /// Given a device and a packet, it returns a tuple representing an entry in a hashmap
+    fn decode_info_from_packet(device: Device, packet: Vec<u8>) -> Result<((String, u16, Protocol), usize), DecodeError> {
         let (eth_header_result, eth_payload) = EthernetHeader::decode(packet);
         let eth_header = eth_header_result?;
 
-        //println!("{:?}", eth_header);
         match eth_header.get_ether_type() {
             EtherType::Ipv4 => {
                 let (ipv4_header_result, ipv4_payload) = Ipv4Header::decode(eth_payload);
                 let ipv4_header = ipv4_header_result?;
+
+
+                let direction = get_direction_from_ipv4(ipv4_header, device);
 
                 //println!("{:?}", ipv4_header);
                 match ipv4_header.get_protocol() {
@@ -86,12 +104,41 @@ pub mod sniffer {
                         let udp_header = udp_header_result?;
                         //println!("{:?}", udp_header);
                         let byte_transmitted = udp_payload.len();
+                        match direction {
+                            Direction::received => {
+                                // useful information is src address and port
+                                let address = ipv4_header.get_src_address();
+                                let port = udp_header.get_src_port();
+                                return Ok(((address, port, Protocol::UDP), byte_transmitted))
+                            },
+                            Direction::Transmitted => {
+                                // useful information is dest address and port
+                                let address = ipv4_header.get_dest_address();
+                                let port = udp_header.get_dest_port();
+                                return Ok(((address, port, Protocol::UDP), byte_transmitted))
+                            }
+                        }
 
                     }
                     Protocol::TCP => {
                         let (tcp_header_result, _tcp_payload) = TCPHeader::decode(ipv4_payload);
                         let tcp_header = tcp_header_result?;
                         //println!("{:?}", tcp_header);
+                        let byte_transmitted = udp_payload.len();
+                        match direction {
+                            Direction::received => {
+                                // useful information is src address and port
+                                let address = ipv4_header.get_src_address();
+                                let port = tcp_header.get_src_port();
+                                return Ok(((address, port, Protocol::TDP), byte_transmitted))
+                            },
+                            Direction::Transmitted => {
+                                // useful information is dest address and port
+                                let address = ipv4_header.get_dest_address();
+                                let port = tcp_header.get_dest_port();
+                                return Ok(((address, port, Protocol::TDP), byte_transmitted))
+                            }
+                        }
                     }
                     Protocol::Unknown => {
                         println!("Unknown 4");
@@ -108,20 +155,50 @@ pub mod sniffer {
                         let (udp_header_result, udp_payload) = UDPHeader::decode(ipv6_payload);
                         let udp_header = udp_header_result?;
                         //println!("{:?}", udp_header);
+                        let byte_transmitted = udp_payload.len();
+                        match direction {
+                            Direction::received => {
+                                // useful information is src address and port
+                                let address = ipv6_header.get_src_address();
+                                let port = udp_header.get_src_port();
+                                return Ok(((address, port, Protocol::UDP), byte_transmitted))
+                            },
+                            Direction::Transmitted => {
+                                // useful information is dest address and port
+                                let address = ipv6_header.get_dest_address();
+                                let port = udp_header.get_dest_port();
+                                return Ok(((address, port, Protocol::UDP), byte_transmitted))
+                            }
+                        }
                     },
                     Protocol::TCP => {
                         let (tcp_header_result, tcp_payload) = TCPHeader::decode(ipv6_payload);
                         let tcp_header = tcp_header_result?;
                         //println!("{:?}", tcp_header);
+                        let byte_transmitted = udp_payload.len();
+                        match direction {
+                            Direction::received => {
+                                // useful information is src address and port
+                                let address = ipv6_header.get_src_address();
+                                let port = tcp_header.get_src_port();
+                                return Ok(((address, port, Protocol::UDP), byte_transmitted))
+                            },
+                            Direction::Transmitted => {
+                                // useful information is dest address and port
+                                let address = ipv4_header.get_dest_address();
+                                let port = tcp_header.get_dest_port();
+                                return Ok(((address, port, Protocol::UDP), byte_transmitted))
+                            }
+                        }
                     },
                     Protocol::Unknown => {
-                        println!("Unknown 4");
+                        return Err(DecodeError{msg: "Cannot decode other level 4 header".parse().unwrap() })
                     }
                 }
             }
             _ => return Err(DecodeError{msg: "Cannot decode other level 3 header".parse().unwrap() }),
         };
-        Ok(())
+        return Err(DecodeError{msg: "Something goes wrong during the packet parsing".parse().unwrap() });
     }
 
     pub struct Sniffer {
@@ -210,32 +287,37 @@ pub mod sniffer {
                     *s = RunStatus::Running;
                     drop(s);
                     self.file = Some(file.unwrap());
-                    // thread per fare lo sniffing
-                    let device = self.device.clone().unwrap();
 
+                    let device = self.device.clone().unwrap();
                     let (tx, rx) = channel();
                     let status = self.status.clone();
+
+                    // The sniffer_thread is istantiated the first time we call the run method.
+
                     let sniffer_thread = thread::spawn(move || {
                         //println!("Sniffing on {:?}", device);
                         let tx = tx.clone();
                         let mut cap = Capture::from_device(device).unwrap().promisc(true).open().unwrap();
 
+                        // polling on the status -> TODO: make it through a condition variable
                         loop {
                             let status = status.lock().unwrap();
                             let current_status = (*status).clone();
                             drop(status);
                             match current_status {
                                 RunStatus::Running => {
-                                    // Extract a new packet from capture
+                                    // Extract a new packet from capture and send it.
                                     match cap.next_packet(){
                                         Ok(packet ) => tx.send(Vec::from(packet.data)).unwrap(),
                                         Err(e) => { println!("{:?}", e); exit(1); }
                                     }
                                 },
                                 RunStatus::Wait => { continue; },
-                                RunStatus::Stop => { println!("Ending the thread"); break; }
+                                RunStatus::Stop => { break; }
                                 RunStatus::Error(e) => { println!("{}", e)}
                             }
+                            // This sleep is requested for next_packet() method
+                            // to avoid buffer overflow.
                             thread::sleep(Duration::from_nanos(100));
                         };
                     });
