@@ -40,7 +40,7 @@ pub mod collect_signals {
             }
         }
 
-        pub fn produce_hashmap(self) -> HashMap<K,V> {
+        pub fn produce_hashmap(&self) -> HashMap<K,V> {
             let l = self.collection.lock().unwrap();
             return l.clone()
         }
