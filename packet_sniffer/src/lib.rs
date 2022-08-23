@@ -14,83 +14,10 @@ pub mod sniffer {
     use std::thread;
     use std::time::Duration;
     use ansi_term::Color::{Blue, Green};
+    use ansi_term::Style;
     use pcap::{Address, Capture, Device};
     use libc;
-    use crate::pkt_parser::{DecodeError, EthernetHeader, EtherType, Header, Ipv4Header, Ipv6Header, Protocol, TCPHeader, UDPHeader};
-
-    #[derive(Debug, Clone, PartialEq)]
-    enum Direction {
-        Received,
-        Transmitted
-    }
-
-    /// the function decode_packet use pkt_parser to parse a packet from layer 2 to 4.
-    pub fn decode_packet(packet: Vec<u8>) -> Result<(), DecodeError>{
-        let (eth_header_result, eth_payload) = EthernetHeader::decode(packet);
-        let eth_header = eth_header_result?;
-
-        //println!("{:?}", eth_header);
-        match eth_header.get_ether_type() {
-            EtherType::Ipv4 => {
-                let (ipv4_header_result, ipv4_payload) = Ipv4Header::decode(eth_payload);
-                let ipv4_header = ipv4_header_result?;
-
-                //println!("{:?}", ipv4_header);
-                match ipv4_header.get_protocol() {
-                    Protocol::UDP => {
-                        let (udp_header_result, udp_payload) = UDPHeader::decode(ipv4_payload);
-                        let udp_header = udp_header_result?;
-                        //println!("{:?}", udp_header);
-                        let byte_transmitted = udp_payload.len();
-
-                    }
-                    Protocol::TCP => {
-                        let (tcp_header_result, _tcp_payload) = TCPHeader::decode(ipv4_payload);
-                        let tcp_header = tcp_header_result?;
-                        //println!("{:?}", tcp_header);
-                    }
-                    Protocol::Unknown => {
-                        println!("Unknown 4");
-                    }
-                }
-            },
-            EtherType::Ipv6 => {
-                let (ipv6_header_result, ipv6_payload) = Ipv6Header::decode(eth_payload);
-                let ipv6_header = ipv6_header_result?;
-
-                //println!("{:?}", ipv6_header);
-                match ipv6_header.get_protocol() {
-                    Protocol::UDP => {
-                        let (udp_header_result, udp_payload) = UDPHeader::decode(ipv6_payload);
-                        let udp_header = udp_header_result?;
-                        //println!("{:?}", udp_header);
-                    },
-                    Protocol::TCP => {
-                        let (tcp_header_result, tcp_payload) = TCPHeader::decode(ipv6_payload);
-                        let tcp_header = tcp_header_result?;
-                        //println!("{:?}", tcp_header);
-                    },
-                    Protocol::Unknown => {
-                        println!("Unknown 4");
-                    }
-                }
-            }
-            _ => return Err(DecodeError{msg: "Cannot decode other level 3 header".parse().unwrap() }),
-        };
-        Ok(())
-    }
-
-    fn get_direction_from_ipv4(header: Ipv4Header, device: Device) -> Direction {
-        if device.addresses.iter().any(|a| a.addr.to_string() == header.get_src_address()) {
-            Direction::Transmitted
-        } else { Direction::Received }
-    }
-
-    fn get_direction_from_ipv6(header: Ipv6Header, device: Device) -> Direction {
-        if device.addresses.iter().any(|a| a.addr.to_string() ==  header.get_src_address()) {
-            Direction::Transmitted
-        } else { Direction::Received }
-    }
+    use crate::pkt_parser::{*};
 
     /// Given a device and a packet, it returns a tuple representing an entry in a hashmap
     fn decode_info_from_packet(device: Device, packet: PacketExt) -> Result<((String, u16, Protocol), (usize, TimeVal)), DecodeError> {
@@ -159,7 +86,7 @@ pub mod sniffer {
                 let ipv6_header = ipv6_header_result?;
 
                 let direction = get_direction_from_ipv6(ipv6_header.clone(), device.clone());
-                // println!("{:?}", direction);
+                //println!("{:?}", direction);
 
                 //println!("{:?}", ipv6_header);
                 match ipv6_header.get_protocol() {
@@ -214,7 +141,7 @@ pub mod sniffer {
 
     pub struct Sniffer {
         device: Option<pcap::Device>,
-        pub status: Arc<Mutex<RunStatus>>,
+        status: Arc<Mutex<RunStatus>>,
         file: Option<File>,
         time_interval: u64,
     }
@@ -261,6 +188,10 @@ pub mod sniffer {
     fn display_device(device: Device) -> String {
         let mut result = String::new();
         result.push_str(&*Blue.paint(device.name).to_string());
+        match device.desc {
+            Some(d) => result.push_str(&*format!("({})", d)),
+            None => ()
+        };
         result.push_str("\nAddresses:\n");
         device.addresses.iter()
             .for_each(|a|{
@@ -350,7 +281,7 @@ pub mod sniffer {
                     }
                     // This sleep is requested for next_packet() method
                     // to avoid buffer overflow.
-                    thread::sleep(Duration::from_nanos(100));
+                    thread::sleep(Duration::from_micros(100));
                 };
             });
 
@@ -365,7 +296,7 @@ pub mod sniffer {
                     match decode_info_from_packet(device, packet) {
                         Ok(info) => {
                             // TODO: Use here collect signals, magari levando la command queue
-                            //println!("{:?}", info);
+                            println!("{:?}", info);
                             ()
                         },
                         Err(e) => println!("{}", e)

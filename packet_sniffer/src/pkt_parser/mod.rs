@@ -1,5 +1,6 @@
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+use pcap::Device;
 
 mod utils {
     use std::fmt;
@@ -62,6 +63,25 @@ pub trait Header: Debug + Clone {
 pub struct DecodeError{
     pub msg: String
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Direction {
+    Received,
+    Transmitted
+}
+
+pub fn get_direction_from_ipv4(header: Ipv4Header, device: Device) -> Direction {
+    if device.addresses.iter().any(|a| a.addr.to_string() == header.get_src_address()) {
+        Direction::Transmitted
+    } else { Direction::Received }
+}
+
+pub fn get_direction_from_ipv6(header: Ipv6Header, device: Device) -> Direction {
+    if device.addresses.iter().any(|a| a.addr.to_string() ==  header.get_src_address()) {
+        Direction::Transmitted
+    } else { Direction::Received }
+}
+
 
 impl Display for DecodeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
