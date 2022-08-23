@@ -210,7 +210,7 @@ fn sniffing(filename: String, timestamp: u64, sniffer: &mut Sniffer) {
                             Err(e) => {println!("{}", e); exit(1)},
                         };
                         if timestamp == 0 {
-                            match sniffer.run(filename) {
+                            match sniffer.run() {
                                 Err(e) => { println!("{}", e); exit(1); }
                                 _ => {}
                             }

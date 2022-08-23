@@ -1,3 +1,5 @@
+extern crate core;
+
 mod pkt_parser;
 mod collect_signals;
 
@@ -6,12 +8,12 @@ pub mod sniffer {
     use std::io::Write;
     use std::path::Path;
     use std::sync::{Arc, Mutex};
-    use std::fmt::{Display, Formatter};
+    use std::fmt::{Display, format, Formatter};
     use std::process::exit;
     use std::sync::mpsc::channel;
     use std::thread;
     use std::time::Duration;
-    use pcap::{Capture, Device};
+    use pcap::{Address, Capture, Device};
     use crate::pkt_parser::{DecodeError, EthernetHeader, EtherType, Header, Ipv4Header, Ipv6Header, Protocol, TCPHeader, UDPHeader};
 
     #[derive(Debug, Clone, PartialEq)]
@@ -77,11 +79,15 @@ pub mod sniffer {
     }
 
     fn get_direction_from_ipv4(header: Ipv4Header, device: Device) -> Direction {
-        Direction::received
+        if device.addresses.iter().any(|a| a.addr.to_string() == header.get_src_address()) {
+            Direction::Transmitted
+        } else { Direction::Received }
     }
 
-    fn get_direction_from_ipv6(header: Ipv4Header, device: Device) -> Direction {
-        Direction::received
+    fn get_direction_from_ipv6(header: Ipv6Header, device: Device) -> Direction {
+        if device.addresses.iter().any(|a| a.addr.to_string() ==  header.get_src_address()) {
+            Direction::Transmitted
+        } else { Direction::Received }
     }
 
     /// Given a device and a packet, it returns a tuple representing an entry in a hashmap
@@ -95,9 +101,11 @@ pub mod sniffer {
                 let ipv4_header = ipv4_header_result?;
 
 
-                let direction = get_direction_from_ipv4(ipv4_header, device);
+                let direction = get_direction_from_ipv4(ipv4_header.clone(), device.clone());
 
-                //println!("{:?}", ipv4_header);
+                println!("{:?}", direction);
+                println!("{:?}", ipv4_header);
+
                 match ipv4_header.get_protocol() {
                     Protocol::UDP => {
                         let (udp_header_result, udp_payload) = UDPHeader::decode(ipv4_payload);
@@ -105,7 +113,7 @@ pub mod sniffer {
                         //println!("{:?}", udp_header);
                         let byte_transmitted = udp_payload.len();
                         match direction {
-                            Direction::received => {
+                            Direction::Received => {
                                 // useful information is src address and port
                                 let address = ipv4_header.get_src_address();
                                 let port = udp_header.get_src_port();
@@ -121,22 +129,22 @@ pub mod sniffer {
 
                     }
                     Protocol::TCP => {
-                        let (tcp_header_result, _tcp_payload) = TCPHeader::decode(ipv4_payload);
+                        let (tcp_header_result, tcp_payload) = TCPHeader::decode(ipv4_payload);
                         let tcp_header = tcp_header_result?;
                         //println!("{:?}", tcp_header);
-                        let byte_transmitted = udp_payload.len();
+                        let byte_transmitted = tcp_payload.len();
                         match direction {
-                            Direction::received => {
+                            Direction::Received => {
                                 // useful information is src address and port
                                 let address = ipv4_header.get_src_address();
                                 let port = tcp_header.get_src_port();
-                                return Ok(((address, port, Protocol::TDP), byte_transmitted))
+                                return Ok(((address, port, Protocol::TCP), byte_transmitted))
                             },
                             Direction::Transmitted => {
                                 // useful information is dest address and port
                                 let address = ipv4_header.get_dest_address();
                                 let port = tcp_header.get_dest_port();
-                                return Ok(((address, port, Protocol::TDP), byte_transmitted))
+                                return Ok(((address, port, Protocol::TCP), byte_transmitted))
                             }
                         }
                     }
@@ -149,6 +157,9 @@ pub mod sniffer {
                 let (ipv6_header_result, ipv6_payload) = Ipv6Header::decode(eth_payload);
                 let ipv6_header = ipv6_header_result?;
 
+                let direction = get_direction_from_ipv6(ipv6_header.clone(), device.clone());
+                println!("{:?}", direction);
+
                 //println!("{:?}", ipv6_header);
                 match ipv6_header.get_protocol() {
                     Protocol::UDP => {
@@ -157,7 +168,7 @@ pub mod sniffer {
                         //println!("{:?}", udp_header);
                         let byte_transmitted = udp_payload.len();
                         match direction {
-                            Direction::received => {
+                            Direction::Received => {
                                 // useful information is src address and port
                                 let address = ipv6_header.get_src_address();
                                 let port = udp_header.get_src_port();
@@ -175,9 +186,9 @@ pub mod sniffer {
                         let (tcp_header_result, tcp_payload) = TCPHeader::decode(ipv6_payload);
                         let tcp_header = tcp_header_result?;
                         //println!("{:?}", tcp_header);
-                        let byte_transmitted = udp_payload.len();
+                        let byte_transmitted = tcp_payload.len();
                         match direction {
-                            Direction::received => {
+                            Direction::Received => {
                                 // useful information is src address and port
                                 let address = ipv6_header.get_src_address();
                                 let port = tcp_header.get_src_port();
@@ -185,7 +196,7 @@ pub mod sniffer {
                             },
                             Direction::Transmitted => {
                                 // useful information is dest address and port
-                                let address = ipv4_header.get_dest_address();
+                                let address = ipv6_header.get_dest_address();
                                 let port = tcp_header.get_dest_port();
                                 return Ok(((address, port, Protocol::UDP), byte_transmitted))
                             }
@@ -279,67 +290,74 @@ pub mod sniffer {
             }
         }
 
-        pub fn run(&mut self, filename: String) -> Result<(), SnifferError> {
+        // prima di fare run, nella sample application, bisogna aver settato il file.
+
+        pub fn run(&self) -> Result<(), SnifferError> {
             let mut s = self.status.lock().unwrap();
-            let file = File::create(Path::new(&filename));
-            match file {
-                Ok(_) => {
-                    *s = RunStatus::Running;
-                    drop(s);
-                    self.file = Some(file.unwrap());
+            *s = RunStatus::Running;
+            drop(s);
 
-                    let device = self.device.clone().unwrap();
-                    let (tx, rx) = channel();
-                    let status = self.status.clone();
+            let main_device = self.device.clone().unwrap().clone();
+            let device = self.device.clone().unwrap().clone();
 
-                    // The sniffer_thread is istantiated the first time we call the run method.
+            let (tx, rx) = channel();
+            let status = self.status.clone();
 
-                    let sniffer_thread = thread::spawn(move || {
-                        //println!("Sniffing on {:?}", device);
-                        let tx = tx.clone();
-                        let mut cap = Capture::from_device(device).unwrap().promisc(true).open().unwrap();
+            // The sniffer_thread is istantiated the first time we call the run method.
 
-                        // polling on the status -> TODO: make it through a condition variable
-                        loop {
-                            let status = status.lock().unwrap();
-                            let current_status = (*status).clone();
-                            drop(status);
-                            match current_status {
-                                RunStatus::Running => {
-                                    // Extract a new packet from capture and send it.
-                                    match cap.next_packet(){
-                                        Ok(packet ) => tx.send(Vec::from(packet.data)).unwrap(),
-                                        Err(e) => { println!("{:?}", e); exit(1); }
-                                    }
-                                },
-                                RunStatus::Wait => { continue; },
-                                RunStatus::Stop => { break; }
-                                RunStatus::Error(e) => { println!("{}", e)}
+            let sniffer_thread = thread::spawn(move || {
+                //println!("Sniffing on {:?}", device);
+                let tx = tx.clone();
+                let mut cap = Capture::from_device(main_device).unwrap().promisc(true).open().unwrap();
+
+                // polling on the status -> TODO: make it through a condition variable
+                loop {
+                    let status = status.lock().unwrap();
+                    let current_status = (*status).clone();
+                    drop(status);
+
+                    match current_status {
+                        RunStatus::Running => {
+                            // Extract a new packet from capture and send it.
+                            match cap.next_packet() {
+                                Ok(packet) => tx.send(Vec::from(packet.data)).unwrap(),
+                                Err(e) => {
+                                    // TODO: return the error
+                                    println!("{:?}", e);
+                                    exit(1);
+                                }
                             }
-                            // This sleep is requested for next_packet() method
-                            // to avoid buffer overflow.
-                            thread::sleep(Duration::from_nanos(100));
-                        };
-                    });
+                        },
+                        RunStatus::Wait => { continue; },
+                        RunStatus::Stop => { break; }
+                        RunStatus::Error(e) => { println!("{}", e) }
+                    }
+                    // This sleep is requested for next_packet() method
+                    // to avoid buffer overflow.
+                    thread::sleep(Duration::from_millis(100));
+                };
+            });
 
-                    let decoder_thread = thread::spawn(move || {
-                        let mut i = 0;
-                        while let Ok(packet) = rx.recv() {
-                            if i % 100 == 0 {
-                                println!("#{}", i);
-                            }
-                            i += 1;
-                            match decode_packet(packet) {
-                                Ok(()) => (),
-                                Err(e) => println!("{}", e)
-                            }
-                        }
-                    });
-                    Ok(())
-                },
-                Err(_) => Err(SnifferError::UserError("The file can't be created".to_string()))
-            }
+            let decoder_thread = thread::spawn(move || {
+                let mut i = 0;
+                while let Ok(packet) = rx.recv() {
+                    let device = device.clone();
+                    // if i % 100 == 0 {
+                    //     println!("#{}", i);
+                    // }
+                    // i += 1;
+                    match decode_info_from_packet(device, packet) {
+                        Ok(info) => {
+                            // TODO: Use here collect signals, magari levando la command queue
+                            ()
+                        },
+                        Err(e) => println!("{}", e)
+                    }
+                }
+            });
+            Ok(())
         }
+
 
         pub fn run_with_interval(&mut self, time_interval: u64, filename: String) -> Result<(), SnifferError> {
             let mut s = self.status.lock().unwrap();
