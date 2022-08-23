@@ -293,9 +293,7 @@ pub mod sniffer {
         // prima di fare run, nella sample application, bisogna aver settato il file.
 
         pub fn run(&self) -> Result<(), SnifferError> {
-            let mut s = self.status.lock().unwrap();
-            *s = RunStatus::Running;
-            drop(s);
+            self.set_status(RunStatus::Running);
 
             let main_device = self.device.clone().unwrap().clone();
             let device = self.device.clone().unwrap().clone();
@@ -360,11 +358,11 @@ pub mod sniffer {
 
 
         pub fn run_with_interval(&mut self, time_interval: u64, filename: String) -> Result<(), SnifferError> {
-            let mut s = self.status.lock().unwrap();
+
             let file = File::create(Path::new(&filename));
             match file {
                 Ok(_) => {
-                    *s = RunStatus::Running;
+                    self.set_status(RunStatus::Running);
                     self.file = Some(file.unwrap());
                     self.time_interval = time_interval;
                     Ok(())
@@ -374,30 +372,30 @@ pub mod sniffer {
         }
 
         pub fn pause(&mut self) -> Result<(), SnifferError> {
-            let mut s = self.status.lock().unwrap();
-            match *s {
+            let status = self.get_status();
+            match status {
                 RunStatus::Error(_) => Err(SnifferError::UserError("The running has stopped".to_string())),
                 _ => {
-                    *s = RunStatus::Wait;
+                    self.set_status(RunStatus::Wait);
                     Ok(())
                 }
             }
         }
 
         pub fn resume(&mut self) -> Result<(), SnifferError> {
-            let mut s = self.status.lock().unwrap();
-            match *s {
+            let status = self.get_status();
+            match status {
                 RunStatus::Error(_) => Err(SnifferError::UserError("The running has stopped".to_string())),
                 _ => {
-                    *s = RunStatus::Running;
+                    self.set_status(RunStatus::Running);
                     Ok(())
                 }
             }
         }
 
         pub fn save_report(&self) -> Result<(), SnifferError> {
-            let s = self.status.lock().unwrap();
-            return match *s {
+            let status = self.get_status();
+            match status {
                 RunStatus::Stop => Err(SnifferError::UserError("The device is not running".to_string())),
                 _ => {
                     match &self.file {
