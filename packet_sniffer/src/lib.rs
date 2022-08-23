@@ -265,16 +265,6 @@ pub mod sniffer {
             }
         }
 
-        pub fn get_status(&self) -> RunStatus {
-            let s = self.status.lock().unwrap();
-            return (*s).clone();
-        }
-
-        pub fn set_status(&self, status: RunStatus) -> () {
-            let mut s = self.status.lock().unwrap();
-            *s = status;
-        }
-
         pub fn attach(&mut self, device: pcap::Device) -> Result<(), SnifferError> {
             return match Sniffer::list_devices() {
                 Ok(devices) => {
@@ -284,37 +274,29 @@ pub mod sniffer {
                             return Ok(())
                         }
                     }
-                    return Err(SnifferError::UserError("The device selected is not in list".to_string()))
+                    return Err(SnifferError::UserError("The device selected is not in list ...".to_string()))
                 },
-                Err(_) => Err(SnifferError::UserError("There aren't devices to select".to_string()))
+                Err(_) => Err(SnifferError::UserError("There aren't devices to select ...".to_string()))
             }
         }
 
-        // prima di fare run, nella sample application, bisogna aver settato il file.
-
         pub fn run(&self) -> Result<(), SnifferError> {
             self.set_status(RunStatus::Running);
-
-            let main_device = self.device.clone().unwrap().clone();
-            let device = self.device.clone().unwrap().clone();
-
             let (tx, rx) = channel();
             let status = self.status.clone();
 
-            // The sniffer_thread is istantiated the first time we call the run method.
-
+            let device= self.get_device().clone().unwrap();
             let sniffer_thread = thread::spawn(move || {
-                //println!("Sniffing on {:?}", device);
                 let tx = tx.clone();
-                let mut cap = Capture::from_device(main_device).unwrap().promisc(true).open().unwrap();
+                let mut cap = Capture::from_device(device).unwrap().promisc(true).open().unwrap();
 
                 // polling on the status -> TODO: make it through a condition variable
                 loop {
-                    let status = status.lock().unwrap();
-                    let current_status = (*status).clone();
-                    drop(status);
+                    let s = status.lock().unwrap();
+                    let status = (*s).clone();
+                    drop(s);
 
-                    match current_status {
+                    match &status {
                         RunStatus::Running => {
                             // Extract a new packet from capture and send it.
                             match cap.next_packet() {
@@ -336,15 +318,15 @@ pub mod sniffer {
                 };
             });
 
+            let device= self.get_device().clone().unwrap();
             let decoder_thread = thread::spawn(move || {
                 let mut i = 0;
                 while let Ok(packet) = rx.recv() {
-                    let device = device.clone();
-                    // if i % 100 == 0 {
-                    //     println!("#{}", i);
-                    // }
-                    // i += 1;
-                    match decode_info_from_packet(device, packet) {
+                     if i % 100 == 0 {
+                         println!("#{}", i);
+                     }
+                     i += 1;
+                    match decode_info_from_packet(device.clone(), packet) {
                         Ok(info) => {
                             // TODO: Use here collect signals, magari levando la command queue
                             ()
@@ -357,14 +339,14 @@ pub mod sniffer {
         }
 
 
-        pub fn run_with_interval(&mut self, time_interval: u64, filename: String) -> Result<(), SnifferError> {
+        pub fn run_with_interval(&mut self) -> Result<(), SnifferError> {
 
-            let file = File::create(Path::new(&filename));
+            let file = File::create(Path::new("asd"));
             match file {
                 Ok(_) => {
                     self.set_status(RunStatus::Running);
                     self.file = Some(file.unwrap());
-                    self.time_interval = time_interval;
+                    self.time_interval = 0;
                     Ok(())
                 },
                 Err(_) => Err(SnifferError::UserError("The file can't be created".to_string()))
@@ -395,16 +377,16 @@ pub mod sniffer {
 
         pub fn save_report(&self) -> Result<(), SnifferError> {
             let status = self.get_status();
-            match status {
-                RunStatus::Stop => Err(SnifferError::UserError("The device is not running".to_string())),
+            match &status {
+                RunStatus::Stop => Err(SnifferError::UserError("The device is not running ...".to_string())),
                 _ => {
-                    match &self.file {
-                        None => Err(SnifferError::UserError("The file doesn't exist".to_string())),
+                    match self.get_file() {
+                        None => Err(SnifferError::UserError("The file doesn't exist ...".to_string())),
                         Some(_) => {
-                            let write = self.file.as_ref().unwrap().write("Prova".as_ref());
+                            let write = self.get_file().as_ref().unwrap().write("Prova".as_ref());
                             match write {
                                 Ok(_) => Ok(()),
-                                Err(_) => Err(SnifferError::UserError("The file can't be saved".to_string()))
+                                Err(_) => Err(SnifferError::UserError("The file can't be saved ...".to_string()))
                             }
                         }
                     }
@@ -412,7 +394,7 @@ pub mod sniffer {
             }
         }
 
-        pub fn time_interval(&self) -> u64 {
+        pub fn get_time_interval(&self) -> u64 {
             self.time_interval
         }
 
@@ -420,12 +402,37 @@ pub mod sniffer {
             self.time_interval = time_interval;
         }
 
-        pub fn file(&self) -> &Option<File> {
+        pub fn get_file(&self) -> &Option<File> {
             &self.file
         }
 
-        pub fn set_file(&mut self, file: Option<File>) {
-            self.file = file;
+        pub fn set_file(&mut self, filename: String) -> Result<(), SnifferError> {
+            let file = File::create(Path::new(&filename));
+            match file {
+                Ok(_) => {
+                    self.file = Some(file.unwrap());
+                    Ok(())
+                },
+                Err(_) => Err(SnifferError::UserError("The file can't be created ...".to_string()))
+            }
+        }
+
+        pub fn get_status(&self) -> RunStatus {
+            let s = self.status.lock().unwrap();
+            return (*s).clone();
+        }
+
+        pub fn set_status(&self, status: RunStatus) -> () {
+            let mut s = self.status.lock().unwrap();
+            *s = status;
+        }
+
+        pub fn get_device(&self) -> &Option<pcap::Device> {
+            &self.device
+        }
+
+        pub fn set_device(&mut self, device: Option<pcap::Device>) {
+            self.device = device;
         }
     }
 }
