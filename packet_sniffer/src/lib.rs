@@ -14,7 +14,9 @@ pub mod sniffer {
     use std::thread;
     use std::time::Duration;
     use pcap::{Address, Capture, Device};
+    use libc;
     use crate::pkt_parser::{DecodeError, EthernetHeader, EtherType, Header, Ipv4Header, Ipv6Header, Protocol, TCPHeader, UDPHeader};
+    use crate::pkt_parser::Protocol::Unknown;
 
     #[derive(Debug, Clone, PartialEq)]
     enum Direction {
@@ -91,8 +93,8 @@ pub mod sniffer {
     }
 
     /// Given a device and a packet, it returns a tuple representing an entry in a hashmap
-    fn decode_info_from_packet(device: Device, packet: Vec<u8>) -> Result<((String, u16, Protocol), usize), DecodeError> {
-        let (eth_header_result, eth_payload) = EthernetHeader::decode(packet);
+    fn decode_info_from_packet(device: Device, packet: PacketExt) -> Result<((String, u16, Protocol), (usize, TimeVal)), DecodeError> {
+        let (eth_header_result, eth_payload) = EthernetHeader::decode(packet.data);
         let eth_header = eth_header_result?;
 
         match eth_header.get_ether_type() {
@@ -102,7 +104,6 @@ pub mod sniffer {
 
 
                 let direction = get_direction_from_ipv4(ipv4_header.clone(), device.clone());
-
                 //println!("{:?}", direction);
                 //println!("{:?}", ipv4_header);
 
@@ -117,13 +118,13 @@ pub mod sniffer {
                                 // useful information is src address and port
                                 let address = ipv4_header.get_src_address();
                                 let port = udp_header.get_src_port();
-                                return Ok(((address, port, Protocol::UDP), byte_transmitted))
+                                return Ok(((address, port, Protocol::UDP), (byte_transmitted, packet.timestamp)))
                             },
                             Direction::Transmitted => {
                                 // useful information is dest address and port
                                 let address = ipv4_header.get_dest_address();
                                 let port = udp_header.get_dest_port();
-                                return Ok(((address, port, Protocol::UDP), byte_transmitted))
+                                return Ok(((address, port, Protocol::UDP), (byte_transmitted, packet.timestamp)))
                             }
                         }
 
@@ -138,18 +139,18 @@ pub mod sniffer {
                                 // useful information is src address and port
                                 let address = ipv4_header.get_src_address();
                                 let port = tcp_header.get_src_port();
-                                return Ok(((address, port, Protocol::TCP), byte_transmitted))
+                                return Ok(((address, port, Protocol::TCP), (byte_transmitted, packet.timestamp)))
                             },
                             Direction::Transmitted => {
                                 // useful information is dest address and port
                                 let address = ipv4_header.get_dest_address();
                                 let port = tcp_header.get_dest_port();
-                                return Ok(((address, port, Protocol::TCP), byte_transmitted))
+                                return Ok(((address, port, Protocol::TCP), (byte_transmitted, packet.timestamp)))
                             }
                         }
                     }
                     Protocol::Unknown => {
-                        println!("Unknown 4");
+                        return Err(DecodeError{msg: format!("Unknown lev 4 protocol")});
                     }
                 }
             },
@@ -172,13 +173,13 @@ pub mod sniffer {
                                 // useful information is src address and port
                                 let address = ipv6_header.get_src_address();
                                 let port = udp_header.get_src_port();
-                                return Ok(((address, port, Protocol::UDP), byte_transmitted))
+                                return Ok(((address, port, Protocol::UDP), (byte_transmitted, packet.timestamp)))
                             },
                             Direction::Transmitted => {
                                 // useful information is dest address and port
                                 let address = ipv6_header.get_dest_address();
                                 let port = udp_header.get_dest_port();
-                                return Ok(((address, port, Protocol::UDP), byte_transmitted))
+                                return Ok(((address, port, Protocol::UDP), (byte_transmitted, packet.timestamp)))
                             }
                         }
                     },
@@ -192,24 +193,23 @@ pub mod sniffer {
                                 // useful information is src address and port
                                 let address = ipv6_header.get_src_address();
                                 let port = tcp_header.get_src_port();
-                                return Ok(((address, port, Protocol::UDP), byte_transmitted))
+                                return Ok(((address, port, Protocol::UDP), (byte_transmitted, packet.timestamp)))
                             },
                             Direction::Transmitted => {
                                 // useful information is dest address and port
                                 let address = ipv6_header.get_dest_address();
                                 let port = tcp_header.get_dest_port();
-                                return Ok(((address, port, Protocol::UDP), byte_transmitted))
+                                return Ok(((address, port, Protocol::UDP), (byte_transmitted, packet.timestamp)))
                             }
                         }
                     },
                     Protocol::Unknown => {
-                        return Err(DecodeError{msg: "Cannot decode other level 4 header".parse().unwrap() })
+                        return Err(DecodeError{msg: format!("Unknown lev 4 protocol")});
                     }
                 }
             }
             _ => return Err(DecodeError{msg: "Cannot decode other level 3 header".parse().unwrap() }),
         };
-        return Err(DecodeError{msg: "Something goes wrong during the packet parsing".parse().unwrap() });
     }
 
     pub struct Sniffer {
@@ -221,15 +221,21 @@ pub mod sniffer {
 
     #[derive(Debug, Clone, PartialEq)]
     struct TimeVal {
-        sec: u32,
-        m_sec: u32,
+        sec: i32,
+        u_sec: i32,
     }
 
+    #[derive(Debug, Clone, PartialEq)]
     struct PacketExt {
         data: Vec<u8>,
         timestamp: TimeVal,
     }
 
+    impl PacketExt {
+        pub fn new(data: &[u8], ts: libc::timeval) -> Self {
+            PacketExt{data: Vec::from(data), timestamp: TimeVal{sec: ts.tv_sec, u_sec: ts.tv_usec}}
+        }
+    }
 
     #[derive(PartialEq, Debug, Clone)]
     pub enum RunStatus {
@@ -296,6 +302,7 @@ pub mod sniffer {
             self.set_status(RunStatus::Running);
 
             let main_device = self.device.clone().unwrap().clone();
+            println!("Running on {:?}", main_device);
             let device = self.device.clone().unwrap().clone();
 
             let (tx, rx) = channel();
@@ -318,7 +325,7 @@ pub mod sniffer {
                         RunStatus::Running => {
                             // Extract a new packet from capture and send it.
                             match cap.next_packet() {
-                                Ok(packet) => tx.send(Vec::from(packet.data)).unwrap(),
+                                Ok(packet) => tx.send(PacketExt::new(packet.data, packet.header.ts)).unwrap(),
                                 Err(e) => {
                                     // TODO: return the error
                                     println!("{:?}", e);
@@ -332,7 +339,7 @@ pub mod sniffer {
                     }
                     // This sleep is requested for next_packet() method
                     // to avoid buffer overflow.
-                    thread::sleep(Duration::from_millis(100));
+                    thread::sleep(Duration::from_nanos(100));
                 };
             });
 
@@ -347,6 +354,7 @@ pub mod sniffer {
                     match decode_info_from_packet(device, packet) {
                         Ok(info) => {
                             // TODO: Use here collect signals, magari levando la command queue
+                            //println!("{:?}", info);
                             ()
                         },
                         Err(e) => println!("{}", e)
