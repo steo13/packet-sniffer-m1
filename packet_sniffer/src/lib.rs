@@ -13,10 +13,10 @@ pub mod sniffer {
     use std::sync::mpsc::channel;
     use std::thread;
     use std::time::Duration;
+    use ansi_term::Color::{Blue, Green};
     use pcap::{Address, Capture, Device};
     use libc;
     use crate::pkt_parser::{DecodeError, EthernetHeader, EtherType, Header, Ipv4Header, Ipv6Header, Protocol, TCPHeader, UDPHeader};
-    use crate::pkt_parser::Protocol::Unknown;
 
     #[derive(Debug, Clone, PartialEq)]
     enum Direction {
@@ -159,7 +159,7 @@ pub mod sniffer {
                 let ipv6_header = ipv6_header_result?;
 
                 let direction = get_direction_from_ipv6(ipv6_header.clone(), device.clone());
-                println!("{:?}", direction);
+                // println!("{:?}", direction);
 
                 //println!("{:?}", ipv6_header);
                 match ipv6_header.get_protocol() {
@@ -258,6 +258,19 @@ pub mod sniffer {
         }
     }
 
+    fn display_device(device: Device) -> String {
+        let mut result = String::new();
+        result.push_str(&*Blue.paint(device.name).to_string());
+        result.push_str("\nAddresses:\n");
+        device.addresses.iter()
+            .for_each(|a|{
+                result.push_str("\t- ");
+                result.push_str(&*Green.paint((*a).addr.to_string()).to_string());
+                result.push_str("\n");
+            });
+        result
+    }
+
     impl Sniffer {
         pub fn new() -> Self {
             return Sniffer { device: None, status: Arc::new(Mutex::new(RunStatus::Stop)), file: None, time_interval: 0 }
@@ -302,7 +315,7 @@ pub mod sniffer {
             self.set_status(RunStatus::Running);
 
             let main_device = self.device.clone().unwrap().clone();
-            println!("Running on {:?}", main_device);
+            print!("Running on {}", display_device(main_device.clone()));
             let device = self.device.clone().unwrap().clone();
 
             let (tx, rx) = channel();
@@ -327,9 +340,7 @@ pub mod sniffer {
                             match cap.next_packet() {
                                 Ok(packet) => tx.send(PacketExt::new(packet.data, packet.header.ts)).unwrap(),
                                 Err(e) => {
-                                    // TODO: return the error
-                                    println!("{:?}", e);
-                                    exit(1);
+                                    SnifferError::PcapError(e);
                                 }
                             }
                         },
