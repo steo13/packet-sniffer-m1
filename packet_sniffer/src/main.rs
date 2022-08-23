@@ -41,9 +41,7 @@ fn main() {
     loop {
         cmd.clear();
 
-        let mut status = sniffer.status.clone();
-        let s = status.lock().unwrap().clone();
-        std::mem::drop(status);
+        let s = sniffer.get_status();
 
         let mut stat = "";
         match s {
@@ -56,8 +54,7 @@ fn main() {
         stdout().flush().unwrap();
         stdin().read_line(&mut cmd).unwrap();
 
-        let status = sniffer.status.clone();
-        let s = status.lock().unwrap().clone();
+        let s = sniffer.get_status();
 
         match cmd.trim().to_ascii_lowercase().as_str() {
             "?" | "help" => { help() },
@@ -65,7 +62,6 @@ fn main() {
             "exit" => {
                 match s {
                     RunStatus::Running | RunStatus::Wait => {
-                        std::mem::drop(status);
                         let mut cmd = String::new();
                         print!("Would you want to stop the running and save? (yes for saving/anything else for no) ");
                         stdout().flush().unwrap();
@@ -88,7 +84,6 @@ fn main() {
             "pause" => {
                 match s {
                     RunStatus::Running => {
-                        std::mem::drop(status);
                         let res = sniffer.pause();
                         if res.is_err() {
                             println!("{}", res.err().unwrap());
@@ -102,7 +97,6 @@ fn main() {
             "resume" => {
                 match s {
                     RunStatus::Wait => {
-                        std::mem::drop(status);
                         let res = sniffer.resume();
                         if res.is_err() {
                             println!("{}", res.err().unwrap());

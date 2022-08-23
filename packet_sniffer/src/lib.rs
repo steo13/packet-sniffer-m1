@@ -103,8 +103,8 @@ pub mod sniffer {
 
                 let direction = get_direction_from_ipv4(ipv4_header.clone(), device.clone());
 
-                println!("{:?}", direction);
-                println!("{:?}", ipv4_header);
+                //println!("{:?}", direction);
+                //println!("{:?}", ipv4_header);
 
                 match ipv4_header.get_protocol() {
                     Protocol::UDP => {
