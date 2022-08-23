@@ -243,6 +243,12 @@ pub mod sniffer {
         // prima di fare run, nella sample application, bisogna aver settato il file.
 
         pub fn run(&self) -> Result<(), SnifferError> {
+            if self.file.is_none() {
+                return Err(SnifferError::UserError("File is null".to_string()));
+            }
+            if self.device.is_none() {
+                return Err(SnifferError::UserError("You have to specify a device".to_string()));
+            }
             self.set_status(RunStatus::Running);
 
             let main_device = self.device.clone().unwrap().clone();
