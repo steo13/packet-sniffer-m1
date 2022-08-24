@@ -20,7 +20,7 @@ pub mod sniffer {
     use crate::pkt_parser::{*};
 
     /// Given a device and a packet, it returns a tuple representing an entry in a hashmap
-    fn decode_info_from_packet(device: Device, packet: PacketExt) -> Result<((String, u16, Protocol), (usize, TimeVal)), DecodeError> {
+    fn decode_info_from_packet(device: Device, packet: PacketExt) -> Result<PacketInfo, DecodeError> {
         let (eth_header_result, eth_payload) = EthernetHeader::decode(packet.data);
         let eth_header = eth_header_result?;
 
@@ -45,13 +45,13 @@ pub mod sniffer {
                                 // useful information is src address and port
                                 let address = ipv4_header.get_src_address();
                                 let port = udp_header.get_src_port();
-                                return Ok(((address, port, Protocol::UDP), (byte_transmitted, packet.timestamp)))
+                                return Ok(PacketInfo::new(address, port, Protocol::UDP, byte_transmitted, packet.timestamp))
                             },
                             Direction::Transmitted => {
                                 // useful information is dest address and port
                                 let address = ipv4_header.get_dest_address();
                                 let port = udp_header.get_dest_port();
-                                return Ok(((address, port, Protocol::UDP), (byte_transmitted, packet.timestamp)))
+                                return Ok(PacketInfo::new(address, port, Protocol::UDP, byte_transmitted, packet.timestamp))
                             }
                         }
 
@@ -66,13 +66,13 @@ pub mod sniffer {
                                 // useful information is src address and port
                                 let address = ipv4_header.get_src_address();
                                 let port = tcp_header.get_src_port();
-                                return Ok(((address, port, Protocol::TCP), (byte_transmitted, packet.timestamp)))
+                                return Ok(PacketInfo::new(address, port, Protocol::TCP, byte_transmitted, packet.timestamp))
                             },
                             Direction::Transmitted => {
                                 // useful information is dest address and port
                                 let address = ipv4_header.get_dest_address();
                                 let port = tcp_header.get_dest_port();
-                                return Ok(((address, port, Protocol::TCP), (byte_transmitted, packet.timestamp)))
+                                return Ok(PacketInfo::new(address, port, Protocol::TCP, byte_transmitted, packet.timestamp))
                             }
                         }
                     }
@@ -100,13 +100,13 @@ pub mod sniffer {
                                 // useful information is src address and port
                                 let address = ipv6_header.get_src_address();
                                 let port = udp_header.get_src_port();
-                                return Ok(((address, port, Protocol::UDP), (byte_transmitted, packet.timestamp)))
+                                return Ok(PacketInfo::new(address, port, Protocol::UDP, byte_transmitted, packet.timestamp))
                             },
                             Direction::Transmitted => {
                                 // useful information is dest address and port
                                 let address = ipv6_header.get_dest_address();
                                 let port = udp_header.get_dest_port();
-                                return Ok(((address, port, Protocol::UDP), (byte_transmitted, packet.timestamp)))
+                                return Ok(PacketInfo::new(address, port, Protocol::UDP, byte_transmitted, packet.timestamp))
                             }
                         }
                     },
@@ -120,13 +120,13 @@ pub mod sniffer {
                                 // useful information is src address and port
                                 let address = ipv6_header.get_src_address();
                                 let port = tcp_header.get_src_port();
-                                return Ok(((address, port, Protocol::UDP), (byte_transmitted, packet.timestamp)))
+                                return Ok(PacketInfo::new(address, port, Protocol::TCP, byte_transmitted, packet.timestamp))
                             },
                             Direction::Transmitted => {
                                 // useful information is dest address and port
                                 let address = ipv6_header.get_dest_address();
                                 let port = tcp_header.get_dest_port();
-                                return Ok(((address, port, Protocol::UDP), (byte_transmitted, packet.timestamp)))
+                                return Ok(PacketInfo::new(address, port, Protocol::TCP, byte_transmitted, packet.timestamp))
                             }
                         }
                     },
@@ -144,12 +144,6 @@ pub mod sniffer {
         status: Arc<Mutex<RunStatus>>,
         file: Option<File>,
         time_interval: u64,
-    }
-
-    #[derive(Debug, Clone, PartialEq)]
-    struct TimeVal {
-        sec: i32,
-        u_sec: i32,
     }
 
     #[derive(Debug, Clone, PartialEq)]
