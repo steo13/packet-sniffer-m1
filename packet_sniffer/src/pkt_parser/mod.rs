@@ -289,11 +289,25 @@ pub struct TimeVal {
 
 impl ToString for TimeVal {
     fn to_string(&self) -> String {
-        let mut string = String::new();
-        string.push_str(self.sec.to_string().as_str());
-        string.push_str(" ");
-        string.push_str(self.u_sec.to_string().as_str());
-        return string;
+        format!("{} {}", self.sec, self.u_sec)
+    }
+}
+
+impl Into<u64> for TimeVal {
+    fn into(self) -> u64 {
+        self.sec * 1e6 + self.u_sec
+    }
+}
+
+impl From<u64> for TimeVal {
+    fn from(v: u64) -> Self {
+        Self {sec: v / 1e6, u_sec: v % 1e6}
+    }
+}
+
+impl TimeVal {
+    pub fn display_as_date() -> String {
+
     }
 }
 

@@ -191,7 +191,6 @@ fn sniffing(sniffer: &mut Sniffer) {
                                 Err(e) => { println!("{}", e); exit(1); }
                                 _ => {}
                             }
-                            println!("The scanning is running ...")
                         } else {
                             match sniffer.run_with_interval() {
                                 Err(e) => { println!("{}", e); exit(1); }
