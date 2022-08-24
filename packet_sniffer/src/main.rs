@@ -6,7 +6,6 @@ use ansi_term::Colour;
 use ansi_term::Style;
 use clap::Parser;
 use std::fs::File;
-use std::os::macos::raw::stat;
 use std::path::Path;
 use std::process::exit;
 use packet_sniffer::sniffer::{RunStatus, Sniffer};
