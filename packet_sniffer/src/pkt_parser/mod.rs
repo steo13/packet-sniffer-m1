@@ -1,5 +1,6 @@
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+use pcap::Device;
 
 mod utils {
     use std::fmt;
@@ -62,6 +63,25 @@ pub trait Header: Debug + Clone {
 pub struct DecodeError{
     pub msg: String
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Direction {
+    Received,
+    Transmitted
+}
+
+pub fn get_direction_from_ipv4(header: Ipv4Header, device: Device) -> Direction {
+    if device.addresses.iter().any(|a| a.addr.to_string() == header.get_src_address()) {
+        Direction::Transmitted
+    } else { Direction::Received }
+}
+
+pub fn get_direction_from_ipv6(header: Ipv6Header, device: Device) -> Direction {
+    if device.addresses.iter().any(|a| a.addr.to_string() ==  header.get_src_address()) {
+        Direction::Transmitted
+    } else { Direction::Received }
+}
+
 
 impl Display for DecodeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -250,9 +270,39 @@ impl TCPHeader {
     pub fn get_dest_port(&self) -> u16 { return self.dest }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeVal {
+    pub(crate) sec: i32,
+    pub(crate) u_sec: i32,
+}
+
+#[derive(Debug, Clone)]
+pub struct PacketInfo {
+    address: String,
+    port: u16,
+    protocol: Protocol,
+    byte_transmitted: usize,
+    ts: TimeVal
+}
+
+impl PacketInfo {
+    pub fn new(address: String, port: u16, protocol: Protocol, byte_transmitted: usize, ts: TimeVal) -> Self {
+        PacketInfo { address, port, protocol, byte_transmitted, ts}
+    }
+
+    pub fn from_decode(address: String, port: u16, protocol: Protocol, byte_transmitted: usize, ts: libc::timeval) -> Self {
+        PacketInfo { address, port, protocol, byte_transmitted, ts: TimeVal{sec: ts.tv_sec, u_sec: ts.tv_usec}}
+    }
+
+    pub fn get_address(&self) -> String { return self.address.clone() }
+    pub fn get_port(&self) -> u16 { return self.port }
+    pub fn get_protocol(&self) -> Protocol { return self.protocol.clone() }
+    pub fn get_byte_transmitted(&self) -> usize { return self.byte_transmitted }
+    pub fn get_time_stamp(&self) -> TimeVal { return self.ts.clone() }
+}
 #[cfg(test)]
 mod tests {
-    use crate::{EthernetHeader, EtherType, Header, Ipv4Header, Protocol, TCPHeader, UDPHeader};
+    use crate::pkt_parser::{*};
 
     #[test]
     fn test_ethernet_packet() {
