@@ -1,5 +1,6 @@
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+//use clap::error::ContextValue::String;
 use pcap::Device;
 
 mod utils {
@@ -147,6 +148,16 @@ pub enum Protocol {
     Unknown
 }
 
+impl ToString for Protocol {
+    fn to_string(&self) -> String {
+        return match &self {
+            Protocol::TCP => "TCP".to_string(),
+            Protocol::UDP => "UDP".to_string(),
+            Protocol::Unknown => "Unknown".to_string()
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Ipv4Header {
     dest: String,
@@ -274,6 +285,16 @@ impl TCPHeader {
 pub struct TimeVal {
     pub(crate) sec: i32,
     pub(crate) u_sec: i32,
+}
+
+impl ToString for TimeVal {
+    fn to_string(&self) -> String {
+        let mut string = String::new();
+        string.push_str(self.sec.to_string().as_str());
+        string.push_str(" ");
+        string.push_str(self.u_sec.to_string().as_str());
+        return string;
+    }
 }
 
 #[derive(Debug, Clone)]
