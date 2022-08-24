@@ -1,5 +1,4 @@
 extern crate core;
-
 mod pkt_parser;
 mod collect_signals;
 
@@ -154,7 +153,7 @@ pub mod sniffer {
 
     impl PacketExt {
         pub fn new(data: &[u8], ts: libc::timeval) -> Self {
-            PacketExt{data: Vec::from(data), timestamp: TimeVal{sec: ts.tv_sec, u_sec: ts.tv_usec}}
+            PacketExt{data: Vec::from(data), timestamp: TimeVal{sec: ts.tv_sec.to_string().parse::<i32>().unwrap(), u_sec: ts.tv_usec}}
         }
     }
 
@@ -184,7 +183,7 @@ pub mod sniffer {
         result.push_str(&*Blue.paint(device.name).to_string());
         match device.desc {
             Some(d) => result.push_str(&*format!("({})", d)),
-            None => ()
+            None => result.push_str(" ...")
         };
         result.push_str("\nAddresses:\n");
         device.addresses.iter()
@@ -220,30 +219,27 @@ pub mod sniffer {
                     }
                     return Err(SnifferError::UserError("The device selected is not in list ...".to_string()))
                 },
-                Err(_) => Err(SnifferError::UserError("There aren't devices to select ...".to_string()))
+                Err(error) => Err(error)
             }
         }
 
         pub fn run(&self) -> Result<(), SnifferError> {
             if self.file.is_none() {
-                return Err(SnifferError::UserError("File is null".to_string()));
+                return Err(SnifferError::UserError("File is null ...".to_string()));
             }
             if self.device.is_none() {
-                return Err(SnifferError::UserError("You have to specify a device".to_string()));
+                return Err(SnifferError::UserError("You have to specify a device ...".to_string()));
             }
             self.set_status(RunStatus::Running);
 
-            let main_device = self.device.clone().unwrap().clone();
-            print!("Running on {}", display_device(main_device.clone()));
             let device = self.device.clone().unwrap().clone();
-
+            print!("Running on {}", display_device(device.clone()));
             let (tx, rx) = channel();
             let status = self.status.clone();
 
-            let device= self.get_device().clone().unwrap();
             let sniffer_thread = thread::spawn(move || {
                 let tx = tx.clone();
-                let mut cap = Capture::from_device(device).unwrap().promisc(true).open().unwrap();
+                let mut cap = Capture::from_device(device.clone()).unwrap().promisc(true).open().unwrap();
 
                 // polling on the status -> TODO: make it through a condition variable
                 loop {
@@ -272,7 +268,6 @@ pub mod sniffer {
             });
 
             let device= self.get_device().clone().unwrap();
-
             let decoder_thread = thread::spawn(move || {
                 let mut i = 0;
                 while let Ok(packet) = rx.recv() {
@@ -295,7 +290,6 @@ pub mod sniffer {
 
 
         pub fn run_with_interval(&mut self) -> Result<(), SnifferError> {
-
             let file = File::create(Path::new("asd"));
             match file {
                 Ok(_) => {
@@ -304,44 +298,52 @@ pub mod sniffer {
                     self.time_interval = 0;
                     Ok(())
                 },
-                Err(_) => Err(SnifferError::UserError("The file can't be created".to_string()))
+                Err(e) => Err(SnifferError::UserError(e.to_string()))
             }
         }
 
         pub fn pause(&mut self) -> Result<(), SnifferError> {
             let status = self.get_status();
-            match status {
-                RunStatus::Error(_) => Err(SnifferError::UserError("The running has stopped".to_string())),
-                _ => {
+            match &status {
+                RunStatus::Error(error) => Err(SnifferError::UserError(error.to_string())),
+                RunStatus::Running => {
                     self.set_status(RunStatus::Wait);
                     Ok(())
-                }
+                },
+                RunStatus::Stop => { return Err(SnifferError::UserWarning("There is no scanning in execution ...".to_string())); },
+                RunStatus::Wait => { return Err(SnifferError::UserWarning("The scanning is already paused ...".to_string())); }
             }
         }
 
         pub fn resume(&mut self) -> Result<(), SnifferError> {
             let status = self.get_status();
-            match status {
-                RunStatus::Error(_) => Err(SnifferError::UserError("The running has stopped".to_string())),
-                _ => {
+            match &status {
+                RunStatus::Error(error) => Err(SnifferError::UserError(error.to_string())),
+                RunStatus::Wait => {
                     self.set_status(RunStatus::Running);
                     Ok(())
-                }
+                },
+                RunStatus::Stop => { return Err(SnifferError::UserWarning("There is no scanning in execution ...".to_string())); },
+                RunStatus::Running => { return Err(SnifferError::UserWarning("The scanning is already running ...".to_string())); }
             }
         }
 
-        pub fn save_report(&self) -> Result<(), SnifferError> {
+        pub fn save_report(&self) -> Result<(String), SnifferError> {
             let status = self.get_status();
             match &status {
-                RunStatus::Stop => Err(SnifferError::UserError("The device is not running ...".to_string())),
+                RunStatus::Error(error) => Err(SnifferError::UserError(error.to_string())),
+                RunStatus::Stop => { Err(SnifferError::UserWarning("The scanning is already stopped ...".to_string())) },
                 _ => {
                     match self.get_file() {
                         None => Err(SnifferError::UserError("The file doesn't exist ...".to_string())),
                         Some(_) => {
                             let write = self.get_file().as_ref().unwrap().write("Prova".as_ref());
                             match write {
-                                Ok(_) => Ok(()),
-                                Err(_) => Err(SnifferError::UserError("The file can't be saved ...".to_string()))
+                                Ok(_) => {
+                                    self.set_status(RunStatus::Stop);
+                                    return Ok(("The report has been saved and the scanning has been stopped ...".to_string()));
+                                },
+                                Err(error) => Err(SnifferError::UserError(error.to_string()))
                             }
                         }
                     }

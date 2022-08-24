@@ -4,11 +4,11 @@ use std::ops::Deref;
 use pcap::Device;
 use ansi_term::Colour;
 use ansi_term::Style;
-use clap::Parser;
+use clap::{command, Parser};
 use std::fs::File;
 use std::path::Path;
 use std::process::exit;
-use packet_sniffer::sniffer::{RunStatus, Sniffer};
+use packet_sniffer::sniffer::{RunStatus, Sniffer, SnifferError};
 
 
 #[derive(Parser, Debug)]
@@ -51,79 +51,31 @@ fn main() {
             "devices" => { devices() },
             "exit" => { exit_prompt(&sniffer) },
             "pause" => {
-                match &status {
-                    RunStatus::Running => {
-                        let res = sniffer.pause();
-                        if res.is_err() { println!("{}", res.err().unwrap()); return; }
-                    },
-                    RunStatus::Error(e) => { println!("{}", e); return; },
-                    RunStatus::Stop => { println!("There is no scanning in execution ..."); },
-                    RunStatus::Wait => { println!("The scanning is already paused ..."); }
+                let res = sniffer.pause();
+                match res {
+                    Err(e) => println!("{}", e),
+                    _ => {}
                 }
             },
             "resume" => {
-                match &status {
-                    RunStatus::Wait => {
-                        let res = sniffer.resume();
-                        if res.is_err() { println!("{}", res.err().unwrap()); return; }
-                    },
-                    RunStatus::Error(e) => { println!("{}", e); return; },
-                    RunStatus::Stop => { println!("There is no scanning in execution ..."); },
-                    RunStatus::Running => { println!("The scanning is already running ..."); }
+                let res = sniffer.resume();
+                match res {
+                    Err(e) => println!("{}", e),
+                    _ => {}
                 }
             },
             "stop" => {
                 let res = sniffer.save_report();
-                if res.is_err() {
-                    println!("{}", res.err().unwrap());
-                    return;
-                }
-                match &status {
-                    RunStatus::Stop => { println!("The scanning is not running ..."); },
-                    _ => {
-                        println!("The report has been saved and the scanning has been stopped ...");
-                        sniffer.set_status(RunStatus::Stop);
-                    }
-                }
+                println!("{}", res.unwrap());
             },
             x => {
-                if x.starts_with("sniff") {
-                    match &status {
-                        RunStatus::Running | RunStatus::Wait => { println!("Another scanning is already running"); },
-                        _ => {
-                            let split: Vec<&str> = x.split(" ").filter(|x| *x != "").collect();
-
-                            let pos_file = split.iter().position(|x| *x == "--file");
-                            if pos_file.is_none() {
-                                println!("The file argument is mandatory, please insert something ...");
-                                continue
-                            } else {
-                                if pos_file.unwrap() == split.len() - 1 || split.get(pos_file.unwrap() + 1).unwrap().starts_with("-") {
-                                    println!("Please insert a filename (not an argument, just a name) ...");
-                                    continue
-                                } else {
-                                    let pos_interval = split.iter().position(|x| *x == "--interval");
-                                    if pos_interval.is_some() {
-                                        if pos_interval.unwrap() == split.len() - 1 || split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().is_err() {
-                                            println!("Please insert a positive number for the interval (sec) ...");
-                                            continue
-                                        } else {
-                                            sniffer.set_time_interval(split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().unwrap());
-                                        }
-                                    }
-                                }
-                            }
-                            match sniffer.set_file((*split.get(pos_file.unwrap() + 1).unwrap().to_string()).to_string()) {
-                                Ok(()) => {},
-                                Err(e) => { println!("{}", e); return; }
-                            }
-                            devices();
-                            sniffing(&mut sniffer);
-                        }
+                let res = check_sniffing(x, &mut sniffer);
+                match res {
+                    Err(error) => { println!("{}", error); continue },
+                    Ok(()) => {
+                        devices();
+                        sniffing(&mut sniffer);
                     }
-                }
-                else{
-                    println!("Unknown command!")
                 }
             }
         }
@@ -177,6 +129,42 @@ fn exit_prompt(sniffer: &Sniffer) {
             }
         },
         _ => { exit(0); }
+    }
+}
+
+fn check_sniffing(command: &str, sniffer: &mut Sniffer) -> Result<(), SnifferError> {
+    return if command.starts_with("sniff") {
+        let status = sniffer.get_status();
+        match &status {
+            RunStatus::Running | RunStatus::Wait => Err(SnifferError::UserWarning("Another scanning is already running ...".to_string())),
+            RunStatus::Error(error) => Err(SnifferError::UserError(error.to_string())),
+            _ => {
+                let split: Vec<&str> = command.split(" ").filter(|x| *x != "").collect();
+                let pos_file = split.iter().position(|x| *x == "--file");
+                if pos_file.is_none() {
+                    return Err(SnifferError::UserWarning("The file argument is mandatory, please insert something ...".to_string()));
+                } else {
+                    if pos_file.unwrap() == split.len() - 1 || split.get(pos_file.unwrap() + 1).unwrap().starts_with("-") {
+                        return Err(SnifferError::UserWarning("Please insert a filename (not an argument, just a name) ...".to_string()));
+                    } else {
+                        let pos_interval = split.iter().position(|x| *x == "--interval");
+                        if pos_interval.is_some() {
+                            if pos_interval.unwrap() == split.len() - 1 || split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().is_err() {
+                                return Err(SnifferError::UserWarning("Please insert a positive number for the interval (sec) ...".to_string()));
+                            } else {
+                                sniffer.set_time_interval(split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().unwrap());
+                            }
+                        }
+                    }
+                }
+                match sniffer.set_file((*split.get(pos_file.unwrap() + 1).unwrap().to_string()).to_string()) {
+                    Ok(()) => Ok(()),
+                    Err(error) => { Err(SnifferError::UserError(error.to_string())) }
+                }
+            }
+        }
+    } else {
+        Err(SnifferError::UserWarning("Unknown command ...".to_string()))
     }
 }
 

@@ -291,7 +291,7 @@ impl PacketInfo {
     }
 
     pub fn from_decode(address: String, port: u16, protocol: Protocol, byte_transmitted: usize, ts: libc::timeval) -> Self {
-        PacketInfo { address, port, protocol, byte_transmitted, ts: TimeVal{sec: ts.tv_sec, u_sec: ts.tv_usec}}
+        PacketInfo { address, port, protocol, byte_transmitted, ts: TimeVal{sec: ts.tv_sec.to_string().parse::<i32>().unwrap(), u_sec: ts.tv_usec}}
     }
 
     pub fn get_address(&self) -> String { return self.address.clone() }
