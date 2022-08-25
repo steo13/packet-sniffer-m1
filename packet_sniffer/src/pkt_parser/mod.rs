@@ -6,6 +6,7 @@
 
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+//use clap::error::ContextValue::String;
 use pcap::Device;
 
 /// A module that contains some utility function, like address to string conversion and display data as hex.
@@ -154,6 +155,16 @@ pub enum Protocol {
     Unknown
 }
 
+impl ToString for Protocol {
+    fn to_string(&self) -> String {
+        return match &self {
+            Protocol::TCP => "TCP".to_string(),
+            Protocol::UDP => "UDP".to_string(),
+            Protocol::Unknown => "Unknown".to_string()
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Ipv4Header {
     dest: String,
@@ -283,6 +294,30 @@ pub struct TimeVal {
     pub(crate) u_sec: i32,
 }
 
+impl ToString for TimeVal {
+    fn to_string(&self) -> String {
+        format!("{} {}", self.sec, self.u_sec)
+    }
+}
+
+impl Into<u64> for TimeVal {
+    fn into(self) -> u64 {
+        self.sec * 1e6 + self.u_sec
+    }
+}
+
+impl From<u64> for TimeVal {
+    fn from(v: u64) -> Self {
+        Self {sec: v / 1e6, u_sec: v % 1e6}
+    }
+}
+
+impl TimeVal {
+    pub fn display_as_date() -> String {
+
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct PacketInfo {
     address: String,
@@ -298,7 +333,7 @@ impl PacketInfo {
     }
 
     pub fn from_decode(address: String, port: u16, protocol: Protocol, byte_transmitted: usize, ts: libc::timeval) -> Self {
-        PacketInfo { address, port, protocol, byte_transmitted, ts: TimeVal{sec: ts.tv_sec, u_sec: ts.tv_usec}}
+        PacketInfo { address, port, protocol, byte_transmitted, ts: TimeVal{sec: ts.tv_sec.to_string().parse::<i32>().unwrap(), u_sec: ts.tv_usec}}
     }
 
     pub fn get_address(&self) -> String { return self.address.clone() }
