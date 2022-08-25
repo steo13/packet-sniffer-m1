@@ -1,7 +1,14 @@
+//! pkt_parser
+//!
+//! This module aim is to provide a way to decode packet header of the TCP-IP stack from raw data, sniffed from an interface. The module is internal to the
+//! packet_sniffer lib.
+
+
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use pcap::Device;
 
+/// A module that contains some utility function, like address to string conversion and display data as hex.
 mod utils {
     use std::fmt;
 
