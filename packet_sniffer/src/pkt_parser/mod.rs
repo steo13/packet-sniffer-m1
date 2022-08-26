@@ -102,8 +102,8 @@ pub enum EtherType {
 
 #[derive(Debug, Clone)]
 pub struct EthernetHeader {
-    dest: String,
-    src: String,
+    _dest: String,
+    _src: String,
     ether_type: EtherType,
 }
 
@@ -127,7 +127,7 @@ impl Header for EthernetHeader {
             )
         };
         (
-            Ok(EthernetHeader{dest: utils::mac_address_to_string(&eth_header[0..6]), src: utils::mac_address_to_string(&eth_header[6..12]) , ether_type }),
+            Ok(EthernetHeader{_dest: utils::mac_address_to_string(&eth_header[0..6]), _src: utils::mac_address_to_string(&eth_header[6..12]) , ether_type }),
             Vec::from(ether_payload)
         )
     }
@@ -137,8 +137,8 @@ impl EthernetHeader {
     pub fn get_ether_type(&self) -> EtherType {
         return self.ether_type.clone();
     }
-    pub fn get_src_address(&self) -> String { return self.src.clone(); }
-    pub fn get_dest_address(&self) -> String { return self.dest.clone(); }
+    pub fn _get_src_address(&self) -> String { return self._src.clone(); }
+    pub fn _get_dest_address(&self) -> String { return self._dest.clone(); }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -283,8 +283,8 @@ impl TCPHeader {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimeVal {
-    pub(crate) sec: i32,
-    pub(crate) u_sec: i32,
+    pub(crate) sec: u32,
+    pub(crate) u_sec: u32,
 }
 
 impl ToString for TimeVal {
@@ -295,21 +295,21 @@ impl ToString for TimeVal {
 
 impl Into<u64> for TimeVal {
     fn into(self) -> u64 {
-        self.sec * 1e6 + self.u_sec
+        (self.sec as u64) * 1000000 + (self.u_sec as u64)
     }
 }
 
 impl From<u64> for TimeVal {
     fn from(v: u64) -> Self {
-        Self {sec: v / 1e6, u_sec: v % 1e6}
+        Self {sec: (v / 1000000) as u32, u_sec: (v % 1000000) as u32}
     }
 }
 
-impl TimeVal {
+/*impl TimeVal {
     pub fn display_as_date() -> String {
 
     }
-}
+}*/
 
 #[derive(Debug, Clone)]
 pub struct PacketInfo {
@@ -323,10 +323,6 @@ pub struct PacketInfo {
 impl PacketInfo {
     pub fn new(address: String, port: u16, protocol: Protocol, byte_transmitted: usize, ts: TimeVal) -> Self {
         PacketInfo { address, port, protocol, byte_transmitted, ts}
-    }
-
-    pub fn from_decode(address: String, port: u16, protocol: Protocol, byte_transmitted: usize, ts: libc::timeval) -> Self {
-        PacketInfo { address, port, protocol, byte_transmitted, ts: TimeVal{sec: ts.tv_sec.to_string().parse::<i32>().unwrap(), u_sec: ts.tv_usec}}
     }
 
     pub fn get_address(&self) -> String { return self.address.clone() }

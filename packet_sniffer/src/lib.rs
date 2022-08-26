@@ -1,27 +1,26 @@
 extern crate core;
+#[macro_use] extern crate prettytable;
+//use prettytable::{Table, Row, Cell};
 mod pkt_parser;
-//mod collect_signals;
 
 pub mod sniffer {
+    use chrono::{Local};
     use std::collections::HashMap;
     use std::fs::File;
-    use std::io::Write;
+    use std::io::{Seek, Write};
     use std::path::Path;
     use std::sync::{Arc, Condvar, Mutex};
-    use std::fmt::{Display, format, Formatter};
-    use std::hash::Hash;
-    use std::process::exit;
+    use std::fmt::{Display, Formatter};
     use std::sync::mpsc::channel;
     use std::thread;
     use std::time::Duration;
     use ansi_term::Color::{Blue, Green};
-    use ansi_term::Style;
-    use pcap::{Address, Capture, Device};
+    use ansi_term::{Colour};
+    use pcap::{Capture, Device};
     use libc;
-    //use crate::collect_signals::collect_signals::CollectSignals;
+    use prettytable::{Cell, Row, Table};
     use crate::pkt_parser::{*};
 
-    /// Given a device and a packet, it returns a tuple representing an entry in a hashmap
     fn decode_info_from_packet(device: Device, packet: PacketExt) -> Result<PacketInfo, DecodeError> {
         let (eth_header_result, eth_payload) = EthernetHeader::decode(packet.data);
         let eth_header = eth_header_result?;
@@ -30,27 +29,20 @@ pub mod sniffer {
             EtherType::Ipv4 => {
                 let (ipv4_header_result, ipv4_payload) = Ipv4Header::decode(eth_payload);
                 let ipv4_header = ipv4_header_result?;
-
-
                 let direction = get_direction_from_ipv4(ipv4_header.clone(), device.clone());
-                //println!("{:?}", direction);
-                //println!("{:?}", ipv4_header);
 
                 match ipv4_header.get_protocol() {
                     Protocol::UDP => {
                         let (udp_header_result, udp_payload) = UDPHeader::decode(ipv4_payload);
                         let udp_header = udp_header_result?;
-                        //println!("{:?}", udp_header);
                         let byte_transmitted = udp_payload.len();
                         match direction {
                             Direction::Received => {
-                                // useful information is src address and port
                                 let address = ipv4_header.get_src_address();
                                 let port = udp_header.get_src_port();
                                 Ok(PacketInfo::new(address, port, Protocol::UDP, byte_transmitted, packet.timestamp))
                             },
                             Direction::Transmitted => {
-                                // useful information is dest address and port
                                 let address = ipv4_header.get_dest_address();
                                 let port = udp_header.get_dest_port();
                                 Ok(PacketInfo::new(address, port, Protocol::UDP, byte_transmitted, packet.timestamp))
@@ -60,17 +52,14 @@ pub mod sniffer {
                     Protocol::TCP => {
                         let (tcp_header_result, tcp_payload) = TCPHeader::decode(ipv4_payload);
                         let tcp_header = tcp_header_result?;
-                        //println!("{:?}", tcp_header);
                         let byte_transmitted = tcp_payload.len();
                         match direction {
                             Direction::Received => {
-                                // useful information is src address and port
                                 let address = ipv4_header.get_src_address();
                                 let port = tcp_header.get_src_port();
                                 Ok(PacketInfo::new(address, port, Protocol::TCP, byte_transmitted, packet.timestamp))
                             },
                             Direction::Transmitted => {
-                                // useful information is dest address and port
                                 let address = ipv4_header.get_dest_address();
                                 let port = tcp_header.get_dest_port();
                                 Ok(PacketInfo::new(address, port, Protocol::TCP, byte_transmitted, packet.timestamp))
@@ -85,26 +74,20 @@ pub mod sniffer {
             EtherType::Ipv6 => {
                 let (ipv6_header_result, ipv6_payload) = Ipv6Header::decode(eth_payload);
                 let ipv6_header = ipv6_header_result?;
-
                 let direction = get_direction_from_ipv6(ipv6_header.clone(), device.clone());
-                //println!("{:?}", direction);
 
-                //println!("{:?}", ipv6_header);
                 match ipv6_header.get_protocol() {
                     Protocol::UDP => {
                         let (udp_header_result, udp_payload) = UDPHeader::decode(ipv6_payload);
                         let udp_header = udp_header_result?;
-                        //println!("{:?}", udp_header);
                         let byte_transmitted = udp_payload.len();
                         match direction {
                             Direction::Received => {
-                                // useful information is src address and port
                                 let address = ipv6_header.get_src_address();
                                 let port = udp_header.get_src_port();
                                 Ok(PacketInfo::new(address, port, Protocol::UDP, byte_transmitted, packet.timestamp))
                             },
                             Direction::Transmitted => {
-                                // useful information is dest address and port
                                 let address = ipv6_header.get_dest_address();
                                 let port = udp_header.get_dest_port();
                                 Ok(PacketInfo::new(address, port, Protocol::UDP, byte_transmitted, packet.timestamp))
@@ -114,17 +97,14 @@ pub mod sniffer {
                     Protocol::TCP => {
                         let (tcp_header_result, tcp_payload) = TCPHeader::decode(ipv6_payload);
                         let tcp_header = tcp_header_result?;
-                        //println!("{:?}", tcp_header);
                         let byte_transmitted = tcp_payload.len();
                         match direction {
                             Direction::Received => {
-                                // useful information is src address and port
                                 let address = ipv6_header.get_src_address();
                                 let port = tcp_header.get_src_port();
                                 Ok(PacketInfo::new(address, port, Protocol::TCP, byte_transmitted, packet.timestamp))
                             },
                             Direction::Transmitted => {
-                                // useful information is dest address and port
                                 let address = ipv6_header.get_dest_address();
                                 let port = tcp_header.get_dest_port();
                                 Ok(PacketInfo::new(address, port, Protocol::TCP, byte_transmitted, packet.timestamp))
@@ -140,14 +120,6 @@ pub mod sniffer {
         };
     }
 
-    pub struct Sniffer {
-        device: Option<pcap::Device>,
-        status: Arc<(Mutex<RunStatus>, Condvar)>,
-        file: Option<File>,
-        time_interval: u64,
-        cs: Arc<Mutex<HashMap<(String, u16), (Protocol, usize, TimeVal)>>>,
-    }
-
     #[derive(Debug, Clone, PartialEq)]
     struct PacketExt {
         data: Vec<u8>,
@@ -156,7 +128,7 @@ pub mod sniffer {
 
     impl PacketExt {
         pub fn new(data: &[u8], ts: libc::timeval) -> Self {
-            PacketExt{data: Vec::from(data), timestamp: TimeVal{sec: ts.tv_sec.to_string().parse::<i32>().unwrap(), u_sec: ts.tv_usec}}
+            PacketExt{data: Vec::from(data), timestamp: TimeVal{sec: ts.tv_sec as u32, u_sec: ts.tv_usec as u32}}
         }
     }
 
@@ -198,10 +170,18 @@ pub mod sniffer {
         result
     }
 
+    pub struct Sniffer {
+        device: Option<pcap::Device>,
+        status: Arc<(Mutex<RunStatus>, Condvar)>,
+        file: Arc<Mutex<Option<File>>>,
+        time_interval: u64,
+        hashmap: Arc<Mutex<HashMap<(String, u16), (Protocol, usize, u64, u64)>>>,
+    }
+
     impl Sniffer {
         pub fn new() -> Self {
             return Sniffer { device: None, status: Arc::new((Mutex::new(RunStatus::Stop), Condvar::new())),
-                file: None, time_interval: 0, cs: Arc::new(Mutex::new(HashMap::new()))
+                file: Arc::new(Mutex::new(None)), time_interval: 0, hashmap: Arc::new(Mutex::new(HashMap::new()))
             }
         }
 
@@ -218,7 +198,7 @@ pub mod sniffer {
                 Ok(devices) => {
                     for dev in &devices {
                         if dev.name == device.name {
-                            self.device = Some(device);
+                            self.set_device(Some(device));
                             return Ok(())
                         }
                     }
@@ -229,32 +209,28 @@ pub mod sniffer {
         }
 
         pub fn run(&mut self) -> Result<(), SnifferError> {
-            if self.file.is_none() {
+            if self.get_file().clone().lock().unwrap().is_none() {
                 return Err(SnifferError::UserError("File is null ...".to_string()));
             }
-            if self.device.is_none() {
+            if self.get_device().is_none() {
                 return Err(SnifferError::UserError("You have to specify a device ...".to_string()));
             }
             self.set_status(RunStatus::Running);
 
-            let device = self.device.clone().unwrap().clone();
+            let device = self.get_device().clone().unwrap();
             print!("Running on {}", display_device(device.clone()));
             let (tx, rx) = channel();
-            let tupla = self.status.clone();
+            let tuple = self.status.clone();
 
-            let sniffer_thread = thread::spawn(move || {
-                let tx = tx.clone();
-                let mut cap = Capture::from_device(device.clone()).unwrap().promisc(true).open().unwrap();
-
-                // polling on the status -> TODO: make it through a condition variable
+            let _sniffer_thread = thread::spawn(move || {
+                let mut cap = Capture::from_device(device).unwrap().promisc(true).open().unwrap();
                 loop {
-                    let mut s = tupla.0.lock().unwrap();
-                    let status = (*s).clone();
+                    let mut _s = tuple.0.lock().unwrap();
+                    let status = (*_s).clone();
 
                     match &status {
                         RunStatus::Running => {
-                            // Extract a new packet from capture and send it.
-                            drop(s);
+                            drop(_s);
                             match cap.next_packet() {
                                 Ok(packet) => {
                                     let res = tx.send(PacketExt::new(packet.data, packet.header.ts));
@@ -269,44 +245,34 @@ pub mod sniffer {
                             }
                         },
                         RunStatus::Wait => {
-                            s = tupla.1.wait_while(s, |status| { *status == RunStatus::Wait }).unwrap();
+                            _s = tuple.1.wait_while(_s, |status| { *status == RunStatus::Wait }).unwrap();
                         },
                         RunStatus::Stop => { break; }
                         RunStatus::Error(e) => { println!("{}", e) }
                     }
-                    // This sleep is requested for next_packet() method
-                    // to avoid buffer overflow.
                     thread::sleep(Duration::from_micros(100));
                 };
             });
 
             let device= self.get_device().clone().unwrap();
-            let mut cs = self.cs.clone();
-            let decoder_thread = thread::spawn(move || {
+            let hashmap = self.get_hashmap().clone();
+
+            let _decoder_thread = thread::spawn(move || {
                 while let Ok(packet) = rx.recv() {
                     match decode_info_from_packet(device.clone(), packet) {
                         Ok(info) => {
-                            let mut l = cs.lock().unwrap();
-                            let existing_pkt = l.get(&(info.get_address(), info.get_port()));
+                            let mut hm = hashmap.lock().unwrap();
+                            let existing_pkt = hm.get(&(info.get_address(), info.get_port()));
                             match existing_pkt {
                                 None => {
-                                    l.insert((info.get_address(), info.get_port()),
-                                             (info.get_protocol(), info.get_byte_transmitted(), info.get_time_stamp()));
+                                    hm.insert((info.get_address(), info.get_port()),
+                                             (info.get_protocol(), info.get_byte_transmitted(), info.get_time_stamp().into(), info.get_time_stamp().into()));
                                 },
                                 value => {
-                                    let mut tv = TimeVal { sec: 0, u_sec: 0 };
-                                    let bytes = info.get_byte_transmitted() + value.unwrap().1;
-
-                                    if info.get_time_stamp().u_sec > value.unwrap().2.u_sec {
-                                        tv.sec = info.get_time_stamp().sec;
-                                        tv.u_sec = info.get_time_stamp().u_sec;
-                                    } else {
-                                        tv.sec = value.unwrap().2.sec;
-                                        tv.u_sec = value.unwrap().2.u_sec;
-                                    }
-
-                                    l.insert((info.get_address(), info.get_port()),
-                                              (info.get_protocol(), bytes, tv));
+                                    let bytes = info.get_byte_transmitted() + value.unwrap().clone().1;
+                                    let first_time =  value.unwrap().clone().2;
+                                    hm.insert((info.get_address(), info.get_port()),
+                                             (info.get_protocol(), bytes, first_time, info.get_time_stamp().into()));
                                 }
                             }
                         },
@@ -318,16 +284,120 @@ pub mod sniffer {
         }
 
         pub fn run_with_interval(&mut self) -> Result<(), SnifferError> {
-            let file = File::create(Path::new("asd"));
-            match file {
-                Ok(_) => {
-                    self.set_status(RunStatus::Running);
-                    self.file = Some(file.unwrap());
-                    self.time_interval = 0;
-                    Ok(())
-                },
-                Err(e) => Err(SnifferError::UserError(e.to_string()))
+            if self.get_file().clone().lock().unwrap().is_none() {
+                return Err(SnifferError::UserError("File is null ...".to_string()));
             }
+            if self.get_device().is_none() {
+                return Err(SnifferError::UserError("You have to specify a device ...".to_string()));
+            }
+            if self.get_time_interval() == 0 {
+                return Err(SnifferError::UserError("You have to specify a time interval ...".to_string()));
+            }
+            self.set_status(RunStatus::Running);
+
+            let device = self.get_device().clone().unwrap();
+            print!("Running on {}", display_device(device.clone()));
+            println!("Saving report after {} {} ...", Colour::Blue.paint(&self.time_interval.to_string()), Colour::Blue.paint("sec"));
+            let (tx, rx) = channel();
+            let tuple = self.status.clone();
+
+            let _sniffer_thread = thread::spawn(move || {
+                let mut cap = Capture::from_device(device.clone()).unwrap().promisc(true).open().unwrap();
+
+                loop {
+                    let mut _s = tuple.0.lock().unwrap();
+                    let status = (*_s).clone();
+
+                    match &status {
+                        RunStatus::Running => {
+                            drop(_s);
+                            match cap.next_packet() {
+                                Ok(packet) => {
+                                    let res = tx.send(PacketExt::new(packet.data, packet.header.ts));
+                                    match res {
+                                        Ok(()) => continue,
+                                        Err(error) => SnifferError::UserError(error.to_string())
+                                    };
+                                },
+                                Err(error) => { SnifferError::PcapError(error); }
+                            }
+                        },
+                        RunStatus::Wait => {
+                            _s = tuple.1.wait_while(_s, |status| { *status == RunStatus::Wait }).unwrap();
+                        },
+                        RunStatus::Stop => { break; }
+                        RunStatus::Error(e) => { println!("{}", e) }
+                    }
+                    thread::sleep(Duration::from_micros(100));
+                };
+            });
+
+            let device= self.get_device().clone().unwrap();
+            let hashmap = self.get_hashmap().clone();
+
+            let _decoder_thread = thread::spawn(move || {
+                while let Ok(packet) = rx.recv() {
+                    match decode_info_from_packet(device.clone(), packet) {
+                        Ok(info) => {
+                            let mut hm = hashmap.lock().unwrap();
+                            let existing_pkt = hm.get(&(info.get_address(), info.get_port()));
+                            match existing_pkt {
+                                None => {
+                                    hm.insert((info.get_address(), info.get_port()),
+                                             (info.get_protocol(), info.get_byte_transmitted(), info.get_time_stamp().into(), info.get_time_stamp().into()));
+                                },
+                                value => {
+                                    let bytes = info.get_byte_transmitted() + value.unwrap().clone().1;
+                                    let first_time =  value.unwrap().clone().2;
+                                    hm.insert((info.get_address(), info.get_port()),
+                                             (info.get_protocol(), bytes, first_time, info.get_time_stamp().into()));
+                                }
+                            }
+                        },
+                        Err(_) => { }
+                    }
+                }
+            });
+
+            let tuple = self.status.clone();
+            let hashmap = self.get_hashmap().clone();
+            let interval = self.get_time_interval().clone();
+            let device = self.get_device().clone().unwrap();
+            let file = self.get_file().clone();
+
+            let _sleep_thread = thread::spawn(move || {
+                //let mut file = file.clone();
+                let mut count = 0;
+                loop {
+                    let mut _s = tuple.0.lock().unwrap();
+                    let status = (*_s).clone();
+
+                    match &status {
+                        RunStatus::Running => {
+                            drop(_s);
+                            let mut heading = String::new();
+                            thread::sleep(Duration::from_secs(interval.clone()));
+                            if count == 0 {
+                                heading = Sniffer::heading(&device.clone());
+                            }
+                            let center = Sniffer::center(hashmap.clone());
+                            heading.push_str(center.as_str());
+                            match file.lock().unwrap().as_ref().unwrap().write(heading.as_bytes()) {
+                                Ok(_) => {},
+                                Err(_) => { break; }
+                            }
+                            count += 1;
+                        },
+                        RunStatus::Wait => {
+                            _s = tuple.1.wait_while(_s, |status| { *status == RunStatus::Wait }).unwrap();
+                        },
+                        RunStatus::Stop => { break; }
+                        RunStatus::Error(e) => { println!("{}", e) }
+                    }
+                }
+                thread::sleep(Duration::from_micros(100));
+            });
+            Ok(())
         }
 
         pub fn pause(&mut self) -> Result<(), SnifferError> {
@@ -336,7 +406,6 @@ pub mod sniffer {
                 RunStatus::Error(error) => Err(SnifferError::UserError(error.to_string())),
                 RunStatus::Running => {
                     self.set_status(RunStatus::Wait);
-                    println!("{:?}", self.cs.clone().lock().unwrap());
                     Ok(())
                 },
                 RunStatus::Stop => { return Err(SnifferError::UserWarning("There is no scanning in execution ...".to_string())); },
@@ -350,7 +419,7 @@ pub mod sniffer {
                 RunStatus::Error(error) => Err(SnifferError::UserError(error.to_string())),
                 RunStatus::Wait => {
                     self.set_status(RunStatus::Running);
-                    self.status.1.notify_one();
+                    self.status.1.notify_all();
                     Ok(())
                 },
                 RunStatus::Stop => { return Err(SnifferError::UserWarning("There is no scanning in execution ...".to_string())); },
@@ -358,23 +427,58 @@ pub mod sniffer {
             }
         }
 
-        pub fn save_report(&self) -> Result<(String), SnifferError> {
+        pub fn heading(device: &Device) -> String {
+            let mut string = "Scanning on: \n\t- Interface ".to_string();
+            string.push_str(device.name.as_str());
+            string.push_str("\nAddresses: ");
+            device.addresses.iter().for_each(|a| {
+                string.push_str("\n\t- ");
+                string.push_str(a.addr.to_string().as_str());
+            });
+            return string
+        }
+
+        pub fn center(hashmap: Arc<Mutex<HashMap<(String, u16), (Protocol, usize, u64, u64)>>>) -> String {
+            let mut center = "\n\nScanning: \n\t- Update Time: ".to_string();
+            center.push_str(Local::now().to_string().as_str());
+            let mut table = Table::new();
+            table.add_row(row!["IP Address", "Port", "Protocol", "Bytes Transmitted", "First Timestamp", "Last Timestamp"]);
+            let hm = hashmap.clone();
+            for (key, value) in hm.lock().unwrap().iter() {
+                table.add_row(Row::new(vec![
+                    Cell::new(key.0.as_str()),
+                    Cell::new(key.1.to_string().as_str()),
+                    Cell::new(value.0.to_string().as_str()),
+                    Cell::new(value.1.to_string().as_str()),
+                    Cell::new(value.2.to_string().as_str()),
+                    Cell::new(value.3.to_string().as_str())
+                ]));
+            }
+            center.push_str("\n");
+            center.push_str(table.to_string().as_str());
+            return center
+        }
+
+        pub fn save_report(&self) -> Result<String, SnifferError> {
             let status = self.get_status();
+            let _ = self.get_file().lock().unwrap().as_ref().unwrap().rewind();
             match &status {
                 RunStatus::Error(error) => Err(SnifferError::UserError(error.to_string())),
                 RunStatus::Stop => { Err(SnifferError::UserWarning("The scanning is already stopped ...".to_string())) },
                 _ => {
-                    match self.get_file() {
-                        None => Err(SnifferError::UserError("The file doesn't exist ...".to_string())),
-                        Some(_) => {
-                            let write = self.get_file().as_ref().unwrap().write("Prova".as_ref());
-                            match write {
-                                Ok(_) => {
-                                    self.set_status(RunStatus::Stop);
-                                    return Ok(("The report has been saved and the scanning has been stopped ...".to_string()));
-                                },
-                                Err(error) => Err(SnifferError::UserError(error.to_string()))
-                            }
+                    if self.get_file().lock().unwrap().is_none() {
+                        Err(SnifferError::UserError("The file doesn't exist ...".to_string()))
+                    } else {
+                        let mut heading = Sniffer::heading(&self.device.as_ref().unwrap().clone());
+                        let center = Sniffer::center(self.get_hashmap().clone());
+                        heading.push_str(center.as_str());
+                        let write = self.get_file().clone().lock().unwrap().as_ref().unwrap().write(heading.as_bytes());
+                        match write {
+                            Ok(_) => {
+                                self.set_status(RunStatus::Stop);
+                                return Ok("The report has been saved and the scanning has been stopped ...".to_string());
+                            },
+                            Err(error) => Err(SnifferError::UserError(error.to_string()))
                         }
                     }
                 },
@@ -389,7 +493,7 @@ pub mod sniffer {
             self.time_interval = time_interval;
         }
 
-        pub fn get_file(&self) -> &Option<File> {
+        pub fn get_file(&self) -> &Arc<Mutex<Option<File>>> {
             &self.file
         }
 
@@ -397,7 +501,7 @@ pub mod sniffer {
             let file = File::create(Path::new(&filename));
             match file {
                 Ok(_) => {
-                    self.file = Some(file.unwrap());
+                    self.file = Arc::new(Mutex::new(Some(file.unwrap())));
                     Ok(())
                 },
                 Err(_) => Err(SnifferError::UserError("The file can't be created ...".to_string()))
@@ -420,6 +524,10 @@ pub mod sniffer {
 
         pub fn set_device(&mut self, device: Option<pcap::Device>) {
             self.device = device;
+        }
+
+        pub fn get_hashmap(&self) -> &Arc<Mutex<HashMap<(String, u16), (Protocol, usize, u64, u64)>>> {
+            &self.hashmap
         }
     }
 }

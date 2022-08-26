@@ -1,13 +1,9 @@
-use std::env::args;
 use std::io::{stdin, stdout, Write};
-use std::ops::Deref;
 use pcap::Device;
 use ansi_term::Colour;
-use ansi_term::Style;
-use clap::{command, Parser};
-use std::fs::File;
-use std::path::Path;
+use clap::{Parser};
 use std::process::exit;
+use std::{env};
 use packet_sniffer::sniffer::{RunStatus, Sniffer, SnifferError};
 
 
@@ -21,6 +17,7 @@ struct Args {
 }
 
 fn main() {
+    env::set_var("RUST_BACKTRACE", "full");
     let mut sniffer = Sniffer::new();
     let mut cmd = String::new();
     let args = Args::parse();
@@ -83,12 +80,12 @@ fn main() {
 }
 
 fn prompt(status: &RunStatus) {
-    let mut stat = "";
+    let mut _stat = "";
     match status {
-        RunStatus::Running => { stat = "Running"; print!("Packet-Sniffer-M1 ({}) >>> ", Colour::Green.italic().paint("Running")); },
-        RunStatus::Wait => { stat = "Waiting"; print!("Packet-Sniffer-M1 ({}) >>> ", Colour::Yellow.italic().paint("Waiting"));},
+        RunStatus::Running => { _stat = "Running"; print!("Packet-Sniffer-M1 ({}) >>> ", Colour::Green.italic().paint("Running")); },
+        RunStatus::Wait => { _stat = "Waiting"; print!("Packet-Sniffer-M1 ({}) >>> ", Colour::Yellow.italic().paint("Waiting"));},
         RunStatus::Error(e) => { println!("{}", e); return; }
-        _ => { stat = "No Sniffing"; print!("Packet-Sniffer-M1 ({}) >>> ", Colour::Blue.italic().paint("No Running"));}
+        _ => { _stat = "No Sniffing"; print!("Packet-Sniffer-M1 ({}) >>> ", Colour::Blue.italic().paint("No Running"));}
     }
 }
 
@@ -196,8 +193,6 @@ fn sniffing(sniffer: &mut Sniffer) {
                                 Err(e) => { println!("{}", e); exit(1); }
                                 _ => {}
                             }
-                            println!("The scanning is running (saving after {} {}) ...",
-                                     Colour::Red.paint(sniffer.get_time_interval().to_string().as_str()), Colour::Red.paint("sec"));
                         }
                         return;
                     }

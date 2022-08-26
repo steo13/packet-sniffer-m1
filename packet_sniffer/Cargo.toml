@@ -9,4 +9,6 @@ edition = "2021"
 ansi_term = "0.12"
 pcap = "0.10.1"
 libc = "*"
+chrono = "0.4"
+prettytable-rs = "^0.9"
 clap = { version = "3.1.6", features = ["derive"] }
