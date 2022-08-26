@@ -1,6 +1,5 @@
 extern crate core;
 #[macro_use] extern crate prettytable;
-//use prettytable::{Table, Row, Cell};
 mod pkt_parser;
 
 pub mod sniffer {

@@ -1,6 +1,8 @@
+//! pkt_parser
+//!
+
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
-//use clap::error::ContextValue::String;
 use pcap::Device;
 
 mod utils {
