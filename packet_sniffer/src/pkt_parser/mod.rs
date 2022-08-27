@@ -6,6 +6,7 @@
 //! - IP(versione 4 e versione 6)
 //! - TCP
 //! - UDP
+//!
 //! Per quanto riguarda i protocolli di livello applicativo, si è preferito non considerarli per ora.
 
 use std::fmt;

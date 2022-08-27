@@ -62,7 +62,7 @@ fn main() {
             },
             "stop" => {
                 match sniffer.save_report() {
-                    Ok(_) => (),
+                    Ok(m) => println!("{}", m),
                     Err(e) => println!("{}", e)
                 };
 
@@ -151,7 +151,11 @@ fn check_sniffing(command: &str, sniffer: &mut Sniffer) -> Result<(), SnifferErr
                             if pos_interval.unwrap() == split.len() - 1 || split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().is_err() {
                                 return Err(SnifferError::UserWarning("Please insert a positive number for the interval (sec) ...".to_string()));
                             } else {
-                                sniffer.set_time_interval(split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().unwrap());
+                                if split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().unwrap() == 0 {
+                                    return Err(SnifferError::UserWarning("Please insert a positive number for the interval (sec) ...".to_string()));
+                                } else {
+                                    sniffer.set_time_interval(split.get(pos_interval.unwrap() + 1).unwrap().trim().parse::<u64>().unwrap());
+                                }
                             }
                         }
                     }
