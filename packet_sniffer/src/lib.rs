@@ -3,7 +3,7 @@ extern crate core;
 mod pkt_parser;
 
 pub mod sniffer {
-    use chrono::{Local};
+    use chrono::{Local, TimeZone};
     use std::collections::HashMap;
     use std::fs::File;
     use std::io::{Seek, Write};
@@ -18,6 +18,7 @@ pub mod sniffer {
     use pcap::{Capture, Device};
     use libc;
     use prettytable::{Cell, Row, Table};
+    use crate::pkt_parser;
     use crate::pkt_parser::{*};
 
     fn decode_info_from_packet(device: Device, packet: PacketExt) -> Result<PacketInfo, DecodeError> {
@@ -444,13 +445,15 @@ pub mod sniffer {
             table.add_row(row!["IP Address", "Port", "Protocol", "Bytes Transmitted", "First Timestamp", "Last Timestamp"]);
             let hm = hashmap.clone();
             for (key, value) in hm.lock().unwrap().iter() {
+                let first = pkt_parser::TimeVal::from(value.2);
+                let last = pkt_parser::TimeVal::from(value.3);
                 table.add_row(Row::new(vec![
                     Cell::new(key.0.as_str()),
                     Cell::new(key.1.to_string().as_str()),
                     Cell::new(value.0.to_string().as_str()),
                     Cell::new(value.1.to_string().as_str()),
-                    Cell::new(value.2.to_string().as_str()),
-                    Cell::new(value.3.to_string().as_str())
+                    Cell::new(Local.timestamp_opt(first.sec as i64, first.u_sec * 1000).unwrap().to_string().as_str()),
+                    Cell::new(Local.timestamp_opt(last.sec as i64, last.u_sec * 1000).unwrap().to_string().as_str())
                 ]));
             }
             center.push_str("\n");
