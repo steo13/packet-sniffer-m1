@@ -452,8 +452,8 @@ pub mod sniffer {
                     Cell::new(key.1.to_string().as_str()),
                     Cell::new(value.0.to_string().as_str()),
                     Cell::new(value.1.to_string().as_str()),
-                    Cell::new(Local.timestamp_opt(first.sec as i64, first.u_sec * 1000).unwrap().to_string().as_str()),
-                    Cell::new(Local.timestamp_opt(last.sec as i64, last.u_sec * 1000).unwrap().to_string().as_str())
+                    Cell::new(format!("{}", Local.timestamp_opt(first.sec as i64, first.u_sec * 1000).unwrap().format("%H:%M:%S %f ns")).as_str()),
+                    Cell::new(format!("{}", Local.timestamp_opt(last.sec as i64, last.u_sec * 1000).unwrap().format("%H:%M:%S %f ns")).as_str()),
                 ]));
             }
             center.push_str("\n");
