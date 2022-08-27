@@ -1,10 +1,19 @@
 //! pkt_parser
+//! Il modulo pkt_parser fornisce alcuni metodi per effettuare il parsing degli header dei più comuni protocolli dello stack TCP/IP.
 //!
+//! Per ora sono supportati i seguenti protocolli:
+//! - Ethernet
+//! - IP(versione 4 e versione 6)
+//! - TCP
+//! - UDP
+//! Per quanto riguarda i protocolli di livello applicativo, si è preferito non considerarli per ora.
 
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use pcap::Device;
 
+/// Il modulo utils contiene alcune funzioni per convertire sequenze di byte(visti come slice di u8) in opportune stringhe rappresentanti indirizzi IP o MAC.
+/// All'interno contiene un tratto per stampare i singoli byte come valori esadecimali.
 mod utils {
     use std::fmt;
 
@@ -56,17 +65,20 @@ mod utils {
     }
 }
 
-/// Header Trait define a common interface for all the Header. An Header should provide a way to decode it from raw data.
+/// Il tratto Header definisce la possibilità di un tipo di essere visto come un header di un protocollo di rete. Per implementarlo deve
+/// fornire una funzione decode che partendo da una sequenza di byte fornisca l'header(se possibile) e il payload.
 pub trait Header: Debug + Clone {
     fn decode(data: Vec<u8>) -> (Result<Self, DecodeError>, Vec<u8>);
 }
 
-/// A custom error to be returned if something goes wrong during the decoding of the packet.
+/// Errore custom che indica un problema nel processo di Decode. L'azione utile di solito è scartare il pacchetto, in quanto probabilmente
+/// è danneggiato.
 #[derive(Debug, Clone)]
 pub struct DecodeError{
     pub msg: String
 }
 
+/// Indica la direzione del pacchetto
 #[derive(Debug, Clone, PartialEq)]
 pub enum Direction {
     Received,

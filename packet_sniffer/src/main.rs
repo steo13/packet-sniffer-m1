@@ -3,7 +3,6 @@ use pcap::Device;
 use ansi_term::Colour;
 use clap::{Parser};
 use std::process::exit;
-use std::{env};
 use packet_sniffer::sniffer::{RunStatus, Sniffer, SnifferError};
 
 
@@ -17,7 +16,7 @@ struct Args {
 }
 
 fn main() {
-    env::set_var("RUST_BACKTRACE", "full");
+    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
     let mut sniffer = Sniffer::new();
     let mut cmd = String::new();
     let args = Args::parse();

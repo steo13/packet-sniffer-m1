@@ -460,7 +460,6 @@ pub mod sniffer {
 
         pub fn save_report(&self) -> Result<String, SnifferError> {
             let status = self.get_status();
-            let _ = self.get_file().lock().unwrap().as_ref().unwrap().rewind();
             match &status {
                 RunStatus::Error(error) => Err(SnifferError::UserError(error.to_string())),
                 RunStatus::Stop => { Err(SnifferError::UserWarning("The scanning is already stopped ...".to_string())) },
@@ -468,6 +467,7 @@ pub mod sniffer {
                     if self.get_file().lock().unwrap().is_none() {
                         Err(SnifferError::UserError("The file doesn't exist ...".to_string()))
                     } else {
+                        let _ = self.get_file().lock().unwrap().as_ref().unwrap().rewind();
                         let mut heading = Sniffer::heading(&self.device.as_ref().unwrap().clone());
                         let center = Sniffer::center(self.get_hashmap().clone());
                         heading.push_str(center.as_str());
