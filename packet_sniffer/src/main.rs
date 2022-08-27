@@ -61,8 +61,11 @@ fn main() {
                 }
             },
             "stop" => {
-                let res = sniffer.save_report();
-                println!("{}", res.unwrap());
+                match sniffer.save_report() {
+                    Ok(_) => (),
+                    Err(e) => println!("{}", e)
+                };
+
             },
             x => {
                 let res = check_sniffing(x, &mut sniffer);
