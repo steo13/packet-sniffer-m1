@@ -14,6 +14,7 @@ pub mod sniffer {
     use std::thread;
     use std::time::Duration;
     use ansi_term::Color::{Blue, Green};
+    use ansi_term::Colour;
     use pcap::{Capture, Device};
     use libc;
     use prettytable::{Cell, Row, Table};
@@ -292,6 +293,8 @@ pub mod sniffer {
                 Ok(()) => {}
                 Err(error) => return Err(error)
             }
+
+            println!("Saving after {} {} ...", Colour::Blue.paint(self.time_interval.to_string()), Colour::Blue.paint("sec".to_string()));
 
             let tuple = self.status.clone();
             let hashmap = self.get_hashmap().clone();
