@@ -29,6 +29,12 @@ fn main() {
             print!("{}", Colour::Yellow.italic().paint("If you have run the application with arguments, the --file argument is mandatory ..."));
             return;
         } else {
+            if args.interval > 0 { sniffer.set_time_interval(args.interval) }
+            let res = sniffer.set_file(args.file);
+            match res {
+                Ok(()) => {},
+                Err(e) => println!("{}", e)
+            }
             devices();
             sniffing(&mut sniffer);
         }
