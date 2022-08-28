@@ -1,6 +1,6 @@
 use std::sync::mpsc::channel;
 use std::thread;
-use pcap::{Capture, Device};
+use pcap::{Device};
 
 fn main() {
     /*println!("Ex - 02 reading from a pcap file");

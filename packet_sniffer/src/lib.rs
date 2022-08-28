@@ -1,6 +1,6 @@
 extern crate core;
 #[macro_use] extern crate prettytable;
-mod pkt_parser;
+pub mod pkt_parser;
 
 pub mod sniffer {
     use chrono::{Local, TimeZone};
@@ -136,7 +136,7 @@ pub mod sniffer {
         Stop, Wait, Running, Error(String)
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq)]
     pub enum SnifferError {
         PcapError(pcap::Error), DecodeError(String), UserError(String), UserWarning(String)
     }

@@ -152,8 +152,8 @@ impl EthernetHeader {
     pub fn get_ether_type(&self) -> EtherType {
         return self.ether_type.clone();
     }
-    pub fn _get_src_address(&self) -> String { return self._src.clone(); }
-    pub fn _get_dest_address(&self) -> String { return self._dest.clone(); }
+    pub fn get_src_address(&self) -> String { return self._src.clone(); }
+    pub fn get_dest_address(&self) -> String { return self._dest.clone(); }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -353,7 +353,7 @@ mod tests {
     #[test]
     fn test_ethernet_packet() {
         let data = vec![51, 51, 0, 1, 0, 2, 80, 235, 113, 35, 142, 103, 134, 221, 96, 9, 31, 94, 0, 103, 17, 1, 254, 128, 0, 0, 0, 0, 0, 0, 5, 194, 180, 157, 9, 91, 63, 25, 255, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 2, 34, 2, 35, 0, 103, 0, 211, 1, 228, 89, 38, 0, 8, 0, 2, 12, 31, 0, 1, 0, 14, 0, 1, 0, 1, 42, 94, 58, 157, 80, 235, 113, 35, 142, 103, 0, 3, 0, 12, 10, 80, 235, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 39, 0, 17, 0, 15, 68, 69, 83, 75, 84, 79, 80, 45, 83, 86, 65, 65, 84, 84, 52, 0, 16, 0, 14, 0, 0, 1, 55, 0, 8, 77, 83, 70, 84, 32, 53, 46, 48, 0, 6, 0, 8, 0, 17, 0, 23, 0, 24, 0, 39];
-        let (ethernet_header_res, payload) = EthernetHeader::decode(data);
+        let (ethernet_header_res, _payload) = EthernetHeader::decode(data);
         let ethernet_header = ethernet_header_res.unwrap();
         assert_eq!(ethernet_header.get_dest_address(), "333300010002".to_string());
         assert_eq!(ethernet_header.get_src_address(), "50eb71238e67".to_string());
@@ -364,7 +364,7 @@ mod tests {
     #[should_panic]
     fn test_empty_packet() {
         let data = vec![];
-        let (ethernet_header_res, payload) = EthernetHeader::decode(data);
+        let (ethernet_header_res, _payload) = EthernetHeader::decode(data);
         ethernet_header_res.unwrap();
     }
 
@@ -384,7 +384,7 @@ mod tests {
         assert_eq!(ipv4_header.get_src_address(), "192.168.1.1".to_string());
         assert_eq!(ipv4_header.get_protocol(), Protocol::UDP);
 
-        let (udp_header_result, udp_payload) = UDPHeader::decode(ipv4_payload);
+        let (udp_header_result, _udp_payload) = UDPHeader::decode(ipv4_payload);
         let udp_header = udp_header_result.unwrap();
 
         assert_eq!(udp_header.get_src_port(), 53);
@@ -407,7 +407,7 @@ mod tests {
         assert_eq!(ipv4_header.get_src_address(), "192.168.1.21".to_string());
         assert_eq!(ipv4_header.get_protocol(), Protocol::TCP);
 
-        let (tcp_header_result, tcp_payload) = TCPHeader::decode(ipv4_payload);
+        let (tcp_header_result, _tcp_payload) = TCPHeader::decode(ipv4_payload);
         let tcp_header = tcp_header_result.unwrap();
 
         assert_eq!(tcp_header.get_src_port(), 56369);
