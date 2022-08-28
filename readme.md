@@ -39,6 +39,11 @@ after a tot number of seconds)
 - `stop`: if you want to stop the sniffing (if one is running) and save the final report
 - `exit`: if you want to exit from the application
 
+## Report
+Examples of final report which could be reached are:
+- [Report](): scanning **without time interval**
+- [Report with time interval](): scanning with **10 sec of time interval**
+
 ## Contributors
 - Stefano Rainò, s282436
 - Alberto Castrignanò, ...
