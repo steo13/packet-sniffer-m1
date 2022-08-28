@@ -8,7 +8,7 @@ the network adapter in promiscuous mode, collect IP address, port and protocol t
 observed traffic and will generate a textual report describing a synthesis of the observed
 events. 
 
-More details about the project could be reached from the [projects.pdf file]() 
+More details about the project could be reached from the [projects.pdf file](https://gitlab.com/gabbiurlaro/packet-sniffer-m1/-/blob/main/packet_sniffer/files/projects.pdf) 
 (Project M1 section).
 
 ## Run
@@ -20,13 +20,13 @@ In this case you have to specify a **name for the file** in which you want to  s
 report, and optionally, also an **interval expressed in seconds** relative to the 
 frequency of saving the scans on the file specified above.
 After this a prompt will appear where you can enter commands to manage the scanning. 
-They can be [viewed in the section below]()
+They can be [viewed in the section below](#commands)
 
 - **Without Arguments**: `cargo run`
 
 In this case, a **command prompt** will appear, through which it will be possible 
 to manage sniffing. The commands that can be used in this phase can be [viewed 
-in the section below]()
+in the section below](#commands)
 
 ### Commands
 - `?` or `help`: if you want to visualize the list of possible commands
@@ -41,8 +41,8 @@ after a tot number of seconds)
 
 ## Report
 Examples of final report which could be reached are:
-- [Report](): scanning **without time interval**
-- [Report with time interval](): scanning with **10 sec of time interval**
+- [Report](https://gitlab.com/gabbiurlaro/packet-sniffer-m1/-/blob/main/packet_sniffer/files/report): scanning **without time interval**
+- [Report with time interval](https://gitlab.com/gabbiurlaro/packet-sniffer-m1/-/blob/main/packet_sniffer/files/report_interval): scanning with **10 sec of time interval**
 
 ## Contributors
 - Stefano Rainò, s282436
