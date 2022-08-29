@@ -363,7 +363,7 @@ pub mod sniffer {
             }
         }
 
-        pub fn heading(device: &Device) -> String {
+        fn heading(device: &Device) -> String {
             let mut string = "Scanning on: \n\t- Interface ".to_string();
             string.push_str(device.name.as_str());
             string.push_str("\nAddresses: ");
@@ -374,7 +374,7 @@ pub mod sniffer {
             return string
         }
 
-        pub fn center(hashmap: Arc<Mutex<HashMap<(String, u16), (Protocol, usize, u64, u64)>>>) -> String {
+        fn center(hashmap: Arc<Mutex<HashMap<(String, u16), (Protocol, usize, u64, u64)>>>) -> String {
             let mut center = "\n\nScanning: \n\t- Update Time: ".to_string();
             center.push_str(Local::now().to_string().as_str());
             let mut table = Table::new();
@@ -463,15 +463,15 @@ pub mod sniffer {
             *s = status;
         }
 
-        pub fn get_device(&self) -> &Option<pcap::Device> {
+        fn get_device(&self) -> &Option<pcap::Device> {
             &self.device
         }
 
-        pub fn set_device(&mut self, device: Option<pcap::Device>) {
+        fn set_device(&mut self, device: Option<pcap::Device>) {
             self.device = device;
         }
 
-        pub fn get_hashmap(&self) -> &Arc<Mutex<HashMap<(String, u16), (Protocol, usize, u64, u64)>>> {
+        fn get_hashmap(&self) -> &Arc<Mutex<HashMap<(String, u16), (Protocol, usize, u64, u64)>>> {
             &self.hashmap
         }
     }
