@@ -193,16 +193,16 @@ fn sniffing(sniffer: &mut Sniffer) {
                     if device.name == cmd.trim().to_string().as_str() {
                         match sniffer.attach(device) {
                             Ok(()) => (),
-                            Err(e) => { println!("{}", e); exit(1)},
+                            Err(e) => { panic!("{}", e) },
                         };
                         if sniffer.get_time_interval() == 0 {
                             match sniffer.run() {
-                                Err(e) => { println!("{}", e); exit(1); }
+                                Err(e) => { panic!("{}", e) }
                                 _ => {}
                             }
                         } else {
                             match sniffer.run_with_interval() {
-                                Err(e) => { println!("{}", e); exit(1); }
+                                Err(e) => { panic!("{}", e) }
                                 _ => {}
                             }
                         }

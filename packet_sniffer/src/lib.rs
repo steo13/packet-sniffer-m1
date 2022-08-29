@@ -458,7 +458,7 @@ pub mod sniffer {
             return (*s).clone();
         }
 
-        pub fn set_status(&self, status: RunStatus) -> () {
+        fn set_status(&self, status: RunStatus) -> () {
             let mut s = self.status.0.lock().unwrap();
             *s = status;
         }
