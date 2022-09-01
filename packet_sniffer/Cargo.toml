@@ -2,7 +2,7 @@
 name = "packet_sniffer"
 version = "0.1.0"
 edition = "2021"
-
+authors = ["Alberto Castrignano", "Stefano Rainò", "Gabriele Iurlaro"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

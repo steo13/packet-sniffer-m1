@@ -1,7 +1,18 @@
+//! Library purpose
+//! Lorem ipsum dolor sit amet .................
+//! Bla bbla bla
+//! ```
+//! use packet_sniffer::sniffer::Sniffer;
+//! let mut sniffer = Sniffer::new();
+//! sniffer.set_file("prova.txt".to_string());
+//! sniffer.attach(Sniffer::list_devices()[0])
+//! sniffer.run();
+//! ```
 extern crate core;
 #[macro_use] extern crate prettytable;
 pub mod pkt_parser;
 
+/// Sniffer module
 pub mod sniffer {
     use chrono::{Local, TimeZone};
     use std::collections::HashMap;
@@ -120,6 +131,7 @@ pub mod sniffer {
         };
     }
 
+    /// it describes a packet, like it arrives from pcap, but it has the Send trait.
     #[derive(Debug, Clone, PartialEq)]
     struct PacketExt {
         data: Vec<u8>,
@@ -132,11 +144,17 @@ pub mod sniffer {
         }
     }
 
+    /// the possible status of the application:
+    /// - Stop: The application starts in this state, or can be after save_report method is called.
+    /// - Wait: The sniffer process can be in wait, using the wait method, if you want to do some task and resume sniffing later.
+    /// - Running: the sniffer is running and collecting data from the given interface.
+    /// - Error(String): An error state.
     #[derive(PartialEq, Debug, Clone, Eq)]
     pub enum RunStatus {
         Stop, Wait, Running, Error(String)
     }
 
+    /// Custom Error that wraps all possible errors that can exit during the library activities
     #[derive(Debug, PartialEq)]
     pub enum SnifferError {
         PcapError(pcap::Error), DecodeError(String), UserError(String), UserWarning(String)
@@ -170,6 +188,8 @@ pub mod sniffer {
         result
     }
 
+    /// The sniffer struct allow to start the sniffing, define the file, the interface to be sniffed and allow interacting with the pcap interface.
+    /// Example of use...
     pub struct Sniffer {
         device: Option<pcap::Device>,
         status: Arc<(Mutex<RunStatus>, Condvar)>,

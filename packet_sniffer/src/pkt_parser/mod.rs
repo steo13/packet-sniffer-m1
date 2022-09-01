@@ -1,20 +1,19 @@
 //! pkt_parser
-//! Il modulo pkt_parser fornisce alcuni metodi per effettuare il parsing degli header dei più comuni protocolli dello stack TCP/IP.
+//! This module defines a common way to decode the main protocol from the TCP/IP stack, including also Ethernet from layer 2.
 //!
-//! Per ora sono supportati i seguenti protocolli:
+//! From now, the module can decode the following protocols:
 //! - Ethernet
-//! - IP(versione 4 e versione 6)
+//! - IP(v4 and v6)
 //! - TCP
 //! - UDP
 //!
-//! Per quanto riguarda i protocolli di livello applicativo, si è preferito non considerarli per ora.
+//! In a first approximation, we decided to ot consider application layer protocols.
 
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use pcap::Device;
 
-/// Il modulo utils contiene alcune funzioni per convertire sequenze di byte(visti come slice di u8) in opportune stringhe rappresentanti indirizzi IP o MAC.
-/// All'interno contiene un tratto per stampare i singoli byte come valori esadecimali.
+/// This module contains some utility function to print u8 slices as address, as defined in the most common protocol.
 mod utils {
     use std::fmt;
 
@@ -66,20 +65,26 @@ mod utils {
     }
 }
 
-/// Il tratto Header definisce la possibilità di un tipo di essere visto come un header di un protocollo di rete. Per implementarlo deve
-/// fornire una funzione decode che partendo da una sequenza di byte fornisca l'header(se possibile) e il payload.
+/// The Header trait define a common behaviour. It requires a decode function that extract from raw data a new header and the remaining bytes.
 pub trait Header: Debug + Clone {
     fn decode(data: Vec<u8>) -> (Result<Self, DecodeError>, Vec<u8>);
 }
 
-/// Errore custom che indica un problema nel processo di Decode. L'azione utile di solito è scartare il pacchetto, in quanto probabilmente
-/// è danneggiato.
+/// A custom error to be returned by a decode function. Some common error can be "next protocol not defined", or "cannot parse an header" because of
+/// damaged packet, so it can be good to discard the packet.
 #[derive(Debug, Clone)]
 pub struct DecodeError{
     pub msg: String
 }
 
-/// Indica la direzione del pacchetto
+impl Display for DecodeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Decode error: {}", self.msg)
+    }
+}
+
+
+/// An Enum that describe the packet direction
 #[derive(Debug, Clone, PartialEq)]
 pub enum Direction {
     Received,
@@ -98,23 +103,15 @@ pub fn get_direction_from_ipv6(header: Ipv6Header, device: Device) -> Direction 
     } else { Direction::Received }
 }
 
-
-impl Display for DecodeError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "Decode error: {}", self.msg)
-    }
-}
-
-/// Ether type
+/// Ether type that we can decode
 #[derive(Debug, Clone, PartialEq)]
 pub enum EtherType {
     Ipv4,
     Ipv6,
-    /// Arp protocol
     ARP,
 }
 
-
+/// describes an Ethernet Header.
 #[derive(Debug, Clone)]
 pub struct EthernetHeader {
     _dest: String,
@@ -156,6 +153,7 @@ impl EthernetHeader {
     pub fn get_dest_address(&self) -> String { return self._dest.clone(); }
 }
 
+/// level 4 protocol
 #[derive(Debug, Clone, PartialEq)]
 pub enum Protocol {
     TCP,
@@ -173,6 +171,7 @@ impl ToString for Protocol {
     }
 }
 
+/// describes an Ipv4 Header
 #[derive(Debug, Clone)]
 pub struct Ipv4Header {
     dest: String,
@@ -214,6 +213,7 @@ impl Ipv4Header {
     pub fn get_dest_address(&self) -> String { return self.dest.clone(); }
 }
 
+/// describes an Ipv6 Header
 #[derive(Debug, Clone)]
 pub struct Ipv6Header {
     dest: String,
@@ -251,7 +251,7 @@ impl Ipv6Header {
     pub fn get_dest_address(&self) -> String { return self.dest.clone(); }
 }
 
-
+/// describes an UDP Header
 #[derive(Debug, Clone)]
 pub struct UDPHeader {
     dest: u16,
@@ -274,6 +274,7 @@ impl Header for UDPHeader {
     }
 }
 
+/// describes a TCP Header
 #[derive(Debug, Clone)]
 pub struct TCPHeader {
     dest: u16,
@@ -326,6 +327,7 @@ impl From<u64> for TimeVal {
     }
 }*/
 
+/// A common way to describe useful information extracted by a packet, wrapped in a single struct
 #[derive(Debug, Clone)]
 pub struct PacketInfo {
     address: String,
@@ -346,6 +348,7 @@ impl PacketInfo {
     pub fn get_byte_transmitted(&self) -> usize { return self.byte_transmitted }
     pub fn get_time_stamp(&self) -> TimeVal { return self.ts.clone() }
 }
+
 #[cfg(test)]
 mod tests {
     use crate::pkt_parser::{*};
