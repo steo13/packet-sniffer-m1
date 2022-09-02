@@ -205,6 +205,7 @@ pub mod sniffer {
             }
         }
 
+        ///Returns the list of available devices.
         pub fn list_devices() -> Result<Vec<pcap::Device>, SnifferError> {
             let devices = pcap::Device::list();
             return match devices {
@@ -213,6 +214,8 @@ pub mod sniffer {
             }
         }
 
+        ///Sets the device that will be used during the sniffing process.
+        ///The specified Device must be listed in the list of devices returned by list_devices().
         pub fn attach(&mut self, device: pcap::Device) -> Result<(), SnifferError> {
             return match Sniffer::list_devices() {
                 Ok(devices) => {
@@ -227,6 +230,7 @@ pub mod sniffer {
                 Err(error) => Err(error)
             }
         }
+
 
         pub fn run(&mut self) -> Result<(), SnifferError> {
             if self.get_file().clone().lock().unwrap().is_none() {
@@ -356,6 +360,8 @@ pub mod sniffer {
             Ok(())
         }
 
+        ///Changes the application status in RunStatus::Wait.
+        ///This function works only if the status is RunStatus::Running.
         pub fn pause(&mut self) -> Result<(), SnifferError> {
             let status = self.get_status();
             match &status {
@@ -369,6 +375,8 @@ pub mod sniffer {
             }
         }
 
+        ///Changes the application status in RunStatus::Running.
+        ///This function works only if the status is RunStatus::Wait.
         pub fn resume(&mut self) -> Result<(), SnifferError> {
             let status = self.get_status();
             match &status {
@@ -417,6 +425,7 @@ pub mod sniffer {
             return center
         }
 
+
         pub fn save_report(&self) -> Result<String, SnifferError> {
             let status = self.get_status();
             match &status {
@@ -450,18 +459,25 @@ pub mod sniffer {
             }
         }
 
+        ///Returns the time interval that has been set.
+        ///Returned value is in seconds
         pub fn get_time_interval(&self) -> u64 {
             self.time_interval
         }
 
+        ///Sets the time interval that will be needed during run_with_interval() execution.
+        ///The specified value is in seconds.
         pub fn set_time_interval(&mut self, time_interval: u64) {
             self.time_interval = time_interval;
         }
 
+        ///Returns the file that has been set.
         pub fn get_file(&self) -> &Arc<Mutex<Option<File>>> {
             &self.file
         }
 
+        ///Sets the file in which sniffing results will be saved.
+        ///This function creates a file with the specified filename.
         pub fn set_file(&mut self, filename: String) -> Result<(), SnifferError> {
             let file = File::create(Path::new(&filename));
             match file {
@@ -473,24 +489,31 @@ pub mod sniffer {
             }
         }
 
+        ///Returns the current status of the sniffer.
+        ///This function waits until the status is available.
         pub fn get_status(&self) -> RunStatus {
             let s = self.status.0.lock().unwrap();
             return (*s).clone();
         }
 
+        ///Sets the status of the sniffer.
+        ///This function waits until the status is available.
         fn set_status(&self, status: RunStatus) -> () {
             let mut s = self.status.0.lock().unwrap();
             *s = status;
         }
 
+        ///Returns the device that has been set.
         fn get_device(&self) -> &Option<pcap::Device> {
             &self.device
         }
 
+        ///Sets the device that will be used for the sniffing.
         fn set_device(&mut self, device: Option<pcap::Device>) {
             self.device = device;
         }
 
+        ///Gets the hashmap in which the sniffing results are being stored.
         fn get_hashmap(&self) -> &Arc<Mutex<HashMap<(String, u16), (Protocol, usize, u64, u64)>>> {
             &self.hashmap
         }
