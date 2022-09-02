@@ -231,82 +231,97 @@ pub mod sniffer {
             }
         }
 
-
+        ///Starts the sniffing process.
+        ///This function requires that a file and a device have been set .
+        ///It works only if the status is RunStatus::Stop.
         pub fn run(&mut self) -> Result<(), SnifferError> {
-            if self.get_file().clone().lock().unwrap().is_none() {
-                return Err(SnifferError::UserError("File is null ...".to_string()));
-            }
-            if self.get_device().is_none() {
-                return Err(SnifferError::UserError("You have to specify a device ...".to_string()));
-            }
-            self.set_status(RunStatus::Running);
-
-            let device = self.get_device().clone().unwrap();
-            print!("Running on {}", display_device(device.clone()));
-            let (tx, rx) = channel();
-            let tuple = self.status.clone();
-
-            let _sniffer_thread = thread::spawn(move || {
-                let mut cap = Capture::from_device(device).unwrap().promisc(true).open().unwrap();
-                loop {
-                    let mut _s = tuple.0.lock().unwrap();
-                    let status = (*_s).clone();
-
-                    match &status {
-                        RunStatus::Running => {
-                            drop(_s);
-                            match cap.next_packet() {
-                                Ok(packet) => {
-                                    let res = tx.send(PacketExt::new(packet.data, packet.header.ts));
-                                    match res {
-                                        Ok(()) => continue,
-                                        Err(error) => SnifferError::UserError(error.to_string())
-                                    };
-                                },
-                                Err(error) => {
-                                    SnifferError::PcapError(error);
-                                }
-                            }
-                        },
-                        RunStatus::Wait => {
-                            _s = tuple.1.wait_while(_s, |status| { *status == RunStatus::Wait }).unwrap();
-                        },
-                        RunStatus::Stop => { break; }
-                        RunStatus::Error(e) => { println!("{}", e) }
+            let status = self.get_status();
+            return match &status {
+                RunStatus::Stop => {
+                    if self.get_file().clone().lock().unwrap().is_none() {
+                        return Err(SnifferError::UserError("File is null ...".to_string()));
                     }
-                    thread::sleep(Duration::from_micros(100));
-                };
-            });
-
-            let device= self.get_device().clone().unwrap();
-            let hashmap = self.get_hashmap().clone();
-
-            let _decoder_thread = thread::spawn(move || {
-                while let Ok(packet) = rx.recv() {
-                    match decode_info_from_packet(device.clone(), packet) {
-                        Ok(info) => {
-                            let mut hm = hashmap.lock().unwrap();
-                            let existing_pkt = hm.get(&(info.get_address(), info.get_port()));
-                            match existing_pkt {
-                                None => {
-                                    hm.insert((info.get_address(), info.get_port()),
-                                             (info.get_protocol(), info.get_byte_transmitted(), info.get_time_stamp().into(), info.get_time_stamp().into()));
-                                },
-                                value => {
-                                    let bytes = info.get_byte_transmitted() + value.unwrap().clone().1;
-                                    let first_time =  value.unwrap().clone().2;
-                                    hm.insert((info.get_address(), info.get_port()),
-                                             (info.get_protocol(), bytes, first_time, info.get_time_stamp().into()));
-                                }
-                            }
-                        },
-                        Err(_) => { }
+                    if self.get_device().is_none() {
+                        return Err(SnifferError::UserError("You have to specify a device ...".to_string()));
                     }
+
+                    self.set_status(RunStatus::Running);
+
+                    let device = self.get_device().clone().unwrap();
+                    print!("Running on {}", display_device(device.clone()));
+                    let (tx, rx) = channel();
+                    let tuple = self.status.clone();
+
+                    let _sniffer_thread = thread::spawn(move || {
+                        let mut cap = Capture::from_device(device).unwrap().promisc(true).open().unwrap();
+                        loop {
+                            let mut _s = tuple.0.lock().unwrap();
+                            let status = (*_s).clone();
+
+                            match &status {
+                                RunStatus::Running => {
+                                    drop(_s);
+                                    match cap.next_packet() {
+                                        Ok(packet) => {
+                                            let res = tx.send(PacketExt::new(packet.data, packet.header.ts));
+                                            match res {
+                                                Ok(()) => continue,
+                                                Err(error) => SnifferError::UserError(error.to_string())
+                                            };
+                                        },
+                                        Err(error) => {
+                                            SnifferError::PcapError(error);
+                                        }
+                                    }
+                                },
+                                RunStatus::Wait => {
+                                    _s = tuple.1.wait_while(_s, |status| { *status == RunStatus::Wait }).unwrap();
+                                },
+                                RunStatus::Stop => { break; }
+                                RunStatus::Error(e) => { println!("{}", e) }
+                            }
+                            thread::sleep(Duration::from_micros(100));
+                        };
+                    });
+
+                    let device = self.get_device().clone().unwrap();
+                    let hashmap = self.get_hashmap().clone();
+
+                    let _decoder_thread = thread::spawn(move || {
+                        while let Ok(packet) = rx.recv() {
+                            match decode_info_from_packet(device.clone(), packet) {
+                                Ok(info) => {
+                                    let mut hm = hashmap.lock().unwrap();
+                                    let existing_pkt = hm.get(&(info.get_address(), info.get_port()));
+                                    match existing_pkt {
+                                        None => {
+                                            hm.insert((info.get_address(), info.get_port()),
+                                                      (info.get_protocol(), info.get_byte_transmitted(), info.get_time_stamp().into(), info.get_time_stamp().into()));
+                                        },
+                                        value => {
+                                            let bytes = info.get_byte_transmitted() + value.unwrap().clone().1;
+                                            let first_time = value.unwrap().clone().2;
+                                            hm.insert((info.get_address(), info.get_port()),
+                                                      (info.get_protocol(), bytes, first_time, info.get_time_stamp().into()));
+                                        }
+                                    }
+                                },
+                                Err(_) => {}
+                            }
+                        }
+                    });
+                    Ok(())
+                },
+                RunStatus::Error(e) => {
+                    return Err(SnifferError::UserWarning("Internal error. Try to instantiate a new sniffer object.".to_string()));
                 }
-            });
-            Ok(())
+                _ => {return Err(SnifferError::UserWarning("Another scanning is already running ...".to_string()))}
+            }
         }
 
+        ///Starts the sniffing process.
+        ///This function requires that a time interval has been set.
+        ///Since it uses the run() method, its requirements still hold also.
         pub fn run_with_interval(&mut self) -> Result<(), SnifferError> {
             if self.get_time_interval() == 0 {
                 return Err(SnifferError::UserError("You have to specify a time interval ...".to_string()));
@@ -376,7 +391,8 @@ pub mod sniffer {
         }
 
         ///Changes the application status in RunStatus::Running.
-        ///This function works only if the status is RunStatus::Wait.
+        ///This function works only if the status is RunStatus::Wait, and if the time interval has been set.
+        ///It automatically writes the collected data every n seconds, with respect to the specified time interval.
         pub fn resume(&mut self) -> Result<(), SnifferError> {
             let status = self.get_status();
             match &status {
@@ -425,7 +441,8 @@ pub mod sniffer {
             return center
         }
 
-
+        ///Saves in the specified file a report of the collected data.
+        ///This function works only if the status is either RunStatus::Wait or RunStatus::Running.
         pub fn save_report(&self) -> Result<String, SnifferError> {
             let status = self.get_status();
             match &status {
