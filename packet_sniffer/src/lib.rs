@@ -1,13 +1,17 @@
-//! Library purpose
-//! Lorem ipsum dolor sit amet .................
-//! Bla bbla bla
-//! ```
+//! The purpose of this library is to provide a simple way to analyze traffic from a given interface. It provides some method
+//! to inspect the different interface of a device and start sniffing. Start the sniffing process is pretty simple:
+//! ```rust
+//! use std::thread;
+//! use chrono::Duration;
 //! use packet_sniffer::sniffer::Sniffer;
 //! let mut sniffer = Sniffer::new();
 //! sniffer.set_file("prova.txt".to_string());
-//! sniffer.attach(Sniffer::list_devices()[0])
+//! sniffer.attach(Sniffer::list_devices()[0]);
 //! sniffer.run();
+//! thread::sleep(Duration::from_secs(2));
+//! sniffer.save_report();
 //! ```
+
 extern crate core;
 #[macro_use] extern crate prettytable;
 pub mod pkt_parser;
@@ -144,14 +148,17 @@ pub mod sniffer {
         }
     }
 
-    /// the possible status of the application:
-    /// - Stop: The application starts in this state, or can be after save_report method is called.
-    /// - Wait: The sniffer process can be in wait, using the wait method, if you want to do some task and resume sniffing later.
-    /// - Running: the sniffer is running and collecting data from the given interface.
-    /// - Error(String): An error state.
+    /// the possible status of the application.
     #[derive(PartialEq, Debug, Clone, Eq)]
     pub enum RunStatus {
-        Stop, Wait, Running, Error(String)
+        /// The application starts in this state, or can be after save_report method is called.
+        Stop,
+        /// The sniffer process can be in wait, using the wait method, if you want to do some task and resume sniffing later.
+        Wait,
+        /// The sniffer is running and collecting data from the given interface.
+        Running,
+        /// An error state.
+        Error(String)
     }
 
     /// Custom Error that wraps all possible errors that can exit during the library activities
@@ -171,6 +178,7 @@ pub mod sniffer {
         }
     }
 
+    /// This function is used to print in a fancy way the device information.
     fn display_device(device: Device) -> String {
         let mut result = String::new();
         result.push_str(&*Blue.paint(device.name).to_string());
