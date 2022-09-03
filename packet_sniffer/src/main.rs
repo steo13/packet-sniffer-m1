@@ -16,7 +16,6 @@ struct Args {
 }
 
 fn main() {
-    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
     let mut sniffer = Sniffer::new();
     let mut cmd = String::new();
     let args = Args::parse();
@@ -69,7 +68,7 @@ fn main() {
             "stop" => {
                 match sniffer.save_report() {
                     Ok(m) => println!("{}", m),
-                    Err(e) => println!("{}", e)
+                    Err(e) => panic!("{}", e)
                 };
 
             },
@@ -127,10 +126,10 @@ fn exit_prompt(sniffer: &Sniffer) {
             match cmd.trim().to_ascii_lowercase().as_str() {
                 "yes" => {
                     let res = sniffer.save_report();
-                    if res.is_err() { println!("{}", res.err().unwrap()); }
-                    exit(1);
+                    if res.is_err() { panic!("{}", res.err().unwrap());}
+                    exit(0);
                 },
-                _ => exit(2)
+                _ => exit(0)
             }
         },
         _ => { exit(0); }
@@ -187,7 +186,10 @@ fn sniffing(sniffer: &mut Sniffer) {
         stdin().read_line(&mut cmd).unwrap();
 
         match cmd.trim().to_ascii_lowercase().as_str() {
-            "exit" => exit_prompt(&sniffer),
+            "exit" => {
+                exit_prompt(&sniffer);
+                break;
+            },
             _ => {
                 for device in Device::list().unwrap() {
                     if device.name == cmd.trim().to_string().as_str() {

@@ -35,6 +35,7 @@ pub mod sniffer {
     use prettytable::{Cell, Row, Table};
     use crate::pkt_parser;
     use crate::pkt_parser::{*};
+    use std::fs::OpenOptions;
 
     fn decode_info_from_packet(device: Device, packet: PacketExt) -> Result<PacketInfo, DecodeError> {
         let (eth_header_result, eth_payload) = EthernetHeader::decode(packet.data);
@@ -201,7 +202,7 @@ pub mod sniffer {
     pub struct Sniffer {
         device: Option<pcap::Device>,
         status: Arc<(Mutex<RunStatus>, Condvar)>,
-        file: Arc<Mutex<Option<File>>>,
+        filename: Option<String>,
         time_interval: u64,
         hashmap: Arc<Mutex<HashMap<(String, u16), (Protocol, usize, u64, u64)>>>,
     }
@@ -209,7 +210,7 @@ pub mod sniffer {
     impl Sniffer {
         pub fn new() -> Self {
             return Sniffer { device: None, status: Arc::new((Mutex::new(RunStatus::Stop), Condvar::new())),
-                file: Arc::new(Mutex::new(None)), time_interval: 0, hashmap: Arc::new(Mutex::new(HashMap::new()))
+                filename: None, time_interval: 0, hashmap: Arc::new(Mutex::new(HashMap::new()))
             }
         }
 
@@ -246,7 +247,7 @@ pub mod sniffer {
             let status = self.get_status();
             return match &status {
                 RunStatus::Stop => {
-                    if self.get_file().clone().lock().unwrap().is_none() {
+                    if self.get_filename().is_none() {
                         return Err(SnifferError::UserError("File is null ...".to_string()));
                     }
                     if self.get_device().is_none() {
@@ -347,7 +348,10 @@ pub mod sniffer {
             let hashmap = self.get_hashmap().clone();
             let interval = self.get_time_interval().clone();
             let device = self.get_device().clone().unwrap();
-            let file = self.get_file().clone();
+            let file = match self.get_filename() {
+                Some(filename) => filename,
+                None => return Err(SnifferError::UserError("File is not set".to_string()))
+            };
 
             let _sleep_thread = thread::spawn(move || {
                 let mut count = 0;
@@ -365,7 +369,8 @@ pub mod sniffer {
                             }
                             let center = Sniffer::center(hashmap.clone());
                             heading.push_str(center.as_str());
-                            match file.lock().unwrap().as_ref().unwrap().write(heading.as_bytes()) {
+                            let mut file = OpenOptions::new().append(true).open(file.clone()).unwrap();
+                            match file.write(heading.as_bytes()) {
                                 Ok(_) => {},
                                 Err(_) => { break; }
                             }
@@ -457,25 +462,40 @@ pub mod sniffer {
                 RunStatus::Error(error) => Err(SnifferError::UserError(error.to_string())),
                 RunStatus::Stop => { Err(SnifferError::UserWarning("The scanning is already stopped ...".to_string())) },
                 _ => {
-                    if self.get_file().lock().unwrap().is_none() {
+                    if self.get_filename().is_none() {
                         Err(SnifferError::UserError("The file doesn't exist ...".to_string()))
                     } else {
                         let write;
                         let center;
                         if self.get_time_interval() == 0 {
-                            let _ = self.get_file().lock().unwrap().as_ref().unwrap().rewind();
+                            let mut file = match OpenOptions::new().write(true).open(self.get_filename().unwrap()) {
+                                Ok(file) => file,
+                                Err(e) => return Err(SnifferError::UserError("Cannot open the file.".to_string()))
+                            };
+                            match file.rewind() {
+                                Ok(_) => (),
+                                Err(e) =>  return Err(SnifferError::UserError("IO goes wrong.".to_string()))
+                            };
+
                             let mut heading = Sniffer::heading(&self.device.as_ref().unwrap().clone());
                             center = Sniffer::center(self.get_hashmap().clone());
                             heading.push_str(center.as_str());
-                            write = self.get_file().clone().lock().unwrap().as_ref().unwrap().write(heading.as_bytes());
+
+                            write = file.write(heading.as_bytes());
+                            //println!("{:?}", write);
                         } else {
                             center = Sniffer::center(self.get_hashmap().clone());
-                            write = self.get_file().clone().lock().unwrap().as_ref().unwrap().write(center.as_bytes());
+                            let mut file = match OpenOptions::new().append(true).open(self.get_filename().unwrap()) {
+                                Ok(file) => file,
+                                Err(e) => return Err(SnifferError::UserError("Cannot open the file.".to_string()))
+                            };
+                            write = file.write(center.as_bytes());
+                            println!("{:?}", write);
                         }
-                        match write {
+                        return match write {
                             Ok(_) => {
                                 self.set_status(RunStatus::Stop);
-                                return Ok("The report has been saved and the scanning has been stopped ...".to_string());
+                                Ok("The report has been saved and the scanning has been stopped ...".to_string())
                             },
                             Err(error) => Err(SnifferError::UserError(error.to_string()))
                         }
@@ -496,9 +516,9 @@ pub mod sniffer {
             self.time_interval = time_interval;
         }
 
-        ///Returns the file that has been set.
-        pub fn get_file(&self) -> &Arc<Mutex<Option<File>>> {
-            &self.file
+        ///Returns the filename that has been set.
+        pub fn get_filename(&self) -> Option<String> {
+            self.filename.clone()
         }
 
         ///Sets the file in which sniffing results will be saved.
@@ -507,7 +527,7 @@ pub mod sniffer {
             let file = File::create(Path::new(&filename));
             match file {
                 Ok(_) => {
-                    self.file = Arc::new(Mutex::new(Some(file.unwrap())));
+                    self.filename = Some(filename);
                     Ok(())
                 },
                 Err(_) => Err(SnifferError::UserError("The file can't be created ...".to_string()))
