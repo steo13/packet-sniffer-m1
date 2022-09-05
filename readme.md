@@ -46,5 +46,5 @@ Examples of final report which could be reached are:
 
 ## Contributors
 - Stefano Rainò, s282436
-- Alberto Castrignanò, ...
+- Alberto Castrignanò, s281689
 - Gabriele Iurlaro, s294917
