@@ -321,8 +321,8 @@ pub mod sniffer {
                     });
                     Ok(())
                 },
-                RunStatus::Error(e) => {
-                    return Err(SnifferError::UserWarning("Internal error. Try to instantiate a new sniffer object.".to_string()));
+                RunStatus::Error(error) => {
+                    return Err(SnifferError::UserWarning(error.to_string()));
                 }
                 _ => {return Err(SnifferError::UserWarning("Another scanning is already running ...".to_string()))}
             }
@@ -470,11 +470,11 @@ pub mod sniffer {
                         if self.get_time_interval() == 0 {
                             let mut file = match OpenOptions::new().write(true).open(self.get_filename().unwrap()) {
                                 Ok(file) => file,
-                                Err(e) => return Err(SnifferError::UserError("Cannot open the file.".to_string()))
+                                Err(error) => return Err(SnifferError::UserError(error.to_string()))
                             };
                             match file.rewind() {
                                 Ok(_) => (),
-                                Err(e) =>  return Err(SnifferError::UserError("IO goes wrong.".to_string()))
+                                Err(error) =>  return Err(SnifferError::UserError(error.to_string()))
                             };
 
                             let mut heading = Sniffer::heading(&self.device.as_ref().unwrap().clone());
@@ -487,7 +487,7 @@ pub mod sniffer {
                             center = Sniffer::center(self.get_hashmap().clone());
                             let mut file = match OpenOptions::new().append(true).open(self.get_filename().unwrap()) {
                                 Ok(file) => file,
-                                Err(e) => return Err(SnifferError::UserError("Cannot open the file.".to_string()))
+                                Err(error) => return Err(SnifferError::UserError(error.to_string()))
                             };
                             write = file.write(center.as_bytes());
                             println!("{:?}", write);
